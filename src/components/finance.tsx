@@ -21,6 +21,7 @@ import {
 import { stores, today, type Session, type StoreId } from "@/lib/domain";
 import {
   balanceAt,
+  cashCategoryLabel,
   canUseFinance,
   cumulative,
   hours,
@@ -110,6 +111,8 @@ function FinanceWorkspace({ session, scope, selectStore, notify }: Props) {
           "総労働時間（分）",
           "振り返り",
           "確認現金残高（円）",
+          "割引券使用枚数（枚）",
+          "割引券割引額（円）",
         ],
         reports.map((r) => [
           storeName(r.storeId),
@@ -121,6 +124,8 @@ function FinanceWorkspace({ session, scope, selectStore, notify }: Props) {
           r.laborMinutes,
           r.memo,
           r.countedCash ?? "",
+          r.voucherCount ?? "",
+          r.voucherDiscount ?? "",
         ]),
       );
     else if (scope !== "all") {
@@ -136,6 +141,10 @@ function FinanceWorkspace({ session, scope, selectStore, notify }: Props) {
           "出金（円）",
           "計算残高（円）",
           "記録元",
+          "レシート金額（参考円）",
+          "レシート摘要",
+          "割引券使用枚数（枚）",
+          "割引券割引額（円）",
         ],
         [
           [
@@ -147,6 +156,10 @@ function FinanceWorkspace({ session, scope, selectStore, notify }: Props) {
             0,
             balanceAt(state, scope, `${month}-01`, true) ?? "未開始",
             "",
+            "",
+            "",
+            "",
+            "",
           ],
           ...rows.map((r) => [
             storeName(scope),
@@ -157,7 +170,27 @@ function FinanceWorkspace({ session, scope, selectStore, notify }: Props) {
             r.payment,
             r.balance,
             r.source,
+            r.movement?.receiptAmount ?? "",
+            r.movement?.receiptDescription ?? "",
+            "",
+            "",
           ]),
+          ...reports
+            .filter((r) => r.voucherCount != null && r.voucherDiscount != null)
+            .map((r) => [
+              storeName(scope),
+              r.date,
+              "割引券（参考）",
+              "現金残高・売上には再計上しません",
+              0,
+              0,
+              "",
+              "日報",
+              "",
+              "",
+              r.voucherCount!,
+              r.voucherDiscount!,
+            ]),
         ],
       );
     }
@@ -859,6 +892,23 @@ function Cashbook({
   const cancelled = state.movements.filter(
     (m) => m.storeId === storeId && m.date.startsWith(month) && m.voided,
   );
+  const reports = state.reports.filter(
+    (r) => r.storeId === storeId && r.date.startsWith(month),
+  );
+  const voucherReports = reports.filter(
+    (r) => r.voucherCount != null && r.voucherDiscount != null,
+  );
+  const usedVouchers = voucherReports.filter(
+    (r) => (r.voucherCount ?? 0) > 0 || (r.voucherDiscount ?? 0) > 0,
+  );
+  const voucherCount = voucherReports.reduce(
+    (sum, r) => sum + (r.voucherCount ?? 0),
+    0,
+  );
+  const voucherDiscount = voucherReports.reduce(
+    (sum, r) => sum + (r.voucherDiscount ?? 0),
+    0,
+  );
   return (
     <>
       <div className="finance-list-heading">
@@ -918,6 +968,7 @@ function Cashbook({
               <tr>
                 <th scope="col">日付・区分</th>
                 <th scope="col">摘要</th>
+                <th scope="col">レシート（参考）</th>
                 <th scope="col">入金</th>
                 <th scope="col">出金</th>
                 <th scope="col">計算残高</th>
@@ -936,6 +987,16 @@ function Cashbook({
                     <span className="ledger-source">
                       {r.source === "日報" ? "日報から自動" : "手入力"}
                     </span>
+                  </td>
+                  <td className="receipt-meta">
+                    {r.movement?.receiptAmount != null ? (
+                      <details>
+                        <summary>{yen(r.movement.receiptAmount)}</summary>
+                        <p>{r.movement.receiptDescription}</p>
+                      </details>
+                    ) : (
+                      <span>未記録</span>
+                    )}
                   </td>
                   <td className="numeric">
                     {r.receipt ? yen(r.receipt) : "—"}
@@ -1003,7 +1064,7 @@ function Cashbook({
             cancelled.map((m) => (
               <article key={m.id}>
                 <span>
-                  {m.date} / {m.category} / {yen(m.amount)}
+                  {m.date} / {cashCategoryLabel(m)} / {yen(m.amount)}
                 </span>
                 <strong>{m.description}</strong>
                 <p>取消理由：{m.voidReason}</p>
@@ -1014,6 +1075,83 @@ function Cashbook({
           )}
         </div>
       )}
+      <section className="panel voucher-panel">
+        <div className="finance-list-heading">
+          <div>
+            <p className="eyebrow">VOUCHERS / REFERENCE ONLY</p>
+            <h2>割引券の使用記録</h2>
+            <p>使用枚数・割引額を、現金の入出金と分けて記録します。</p>
+          </div>
+          <button
+            className="button secondary"
+            onClick={() =>
+              openDaily(month === today().slice(0, 7) ? today() : `${month}-01`)
+            }
+          >
+            <NotebookPen size={16} />
+            割引券を記録
+          </button>
+        </div>
+        <div className="voucher-summary">
+          <div>
+            <span>記録済みの使用枚数</span>
+            <strong>
+              {voucherCount.toLocaleString("ja-JP")}
+              <small>枚</small>
+            </strong>
+          </div>
+          <div>
+            <span>記録済みの割引額</span>
+            <strong>{yen(voucherDiscount)}</strong>
+          </div>
+        </div>
+        <p className="finance-form-hint">
+          売上は割引後の金額を入力します。ここに記録した割引額で現金残高を動かしたり、売上から再度差し引いたりしません。
+        </p>
+        <p className="voucher-coverage">
+          割引券記録済み：日報 {voucherReports.length}/{reports.length}{" "}
+          件。未記録は「使用なし」とみなしません。
+        </p>
+        {usedVouchers.length ? (
+          <div className="finance-table-wrap">
+            <table className="finance-table voucher-table">
+              <caption className="sr-only">割引券の使用枚数・割引額</caption>
+              <thead>
+                <tr>
+                  <th scope="col">日付</th>
+                  <th scope="col">使用枚数</th>
+                  <th scope="col">割引額</th>
+                  <th scope="col">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                {usedVouchers
+                  .sort((a, b) => b.date.localeCompare(a.date))
+                  .map((r) => (
+                    <tr key={r.id}>
+                      <th scope="row">{r.date}</th>
+                      <td>{r.voucherCount}枚</td>
+                      <td>{yen(r.voucherDiscount ?? 0)}</td>
+                      <td>
+                        <button
+                          className="text-button"
+                          onClick={() => openDaily(r.date)}
+                        >
+                          <Pencil size={14} />
+                          記録を編集
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="muted small voucher-empty">
+            この月の割引券使用の記録はまだありません。使わなかった日は日報で枚数・金額を両方0にして記録してください。
+          </p>
+        )}
+      </section>
     </>
   );
 }
@@ -1086,12 +1224,20 @@ function FinanceAuditValues({ data }: { data: FinanceAudit["before"] }) {
         <div>
           <dt>明細</dt>
           <dd>
-            {data.direction} / {data.category} / {yen(data.amount)}
+            {data.direction} / {cashCategoryLabel(data)} / {yen(data.amount)}
           </dd>
         </div>
         <div>
           <dt>摘要</dt>
           <dd>{data.description}</dd>
+        </div>
+        <div>
+          <dt>レシート（金額・摘要）</dt>
+          <dd>
+            {data.receiptAmount == null
+              ? "未記録"
+              : `${yen(data.receiptAmount)} / ${data.receiptDescription ?? ""}`}
+          </dd>
         </div>
         <div>
           <dt>取消理由</dt>

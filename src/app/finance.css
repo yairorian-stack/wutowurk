@@ -596,6 +596,107 @@
   color: #8d9e77;
   line-height: 1.9;
 }
+.voucher-panel {
+  padding: 23px;
+  margin-top: 25px;
+}
+.voucher-panel .finance-list-heading {
+  margin-top: 0;
+}
+.voucher-summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+  margin: 18px 0;
+  background: #eef2e5;
+  border-radius: 6px;
+  padding: 17px;
+}
+.voucher-summary span {
+  display: block;
+  font-size: 11px;
+  color: #82966e;
+}
+.voucher-summary strong {
+  display: block;
+  font-size: 25px;
+  font-weight: 500;
+  color: #5d7b49;
+  margin-top: 7px;
+}
+.voucher-summary small {
+  font-size: 12px;
+  margin-left: 7px;
+}
+.voucher-coverage {
+  font-size: 11px;
+  color: #8f9b80;
+  margin: 12px 0 17px;
+}
+.voucher-empty {
+  line-height: 1.9;
+  padding: 10px 0;
+}
+.voucher-table {
+  min-width: 480px;
+}
+.receipt-meta {
+  min-width: 150px;
+  max-width: 220px;
+}
+.receipt-meta summary {
+  color: #81936e;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.receipt-meta details p {
+  margin-top: 9px;
+  font-size: 11px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: #8b997b;
+}
+.receipt-input > label {
+  display: block;
+  margin-bottom: 14px;
+}
+.receipt-input > label:last-of-type {
+  margin-bottom: 0;
+}
+.voucher-input .form-row {
+  display: grid;
+}
+.voucher-input .form-row label {
+  display: block;
+}
+.voucher-input .form-row input {
+  margin-top: 7px;
+}
+@media (max-width: 760px) {
+  .voucher-panel {
+    padding: 19px;
+  }
+  .voucher-summary {
+    gap: 12px;
+    padding: 14px;
+  }
+  .voucher-summary span {
+    font-size: 11px;
+  }
+  .voucher-summary strong {
+    font-size: 24px;
+  }
+  .voucher-coverage {
+    font-size: 12px;
+    line-height: 1.9;
+  }
+  .receipt-meta details p {
+    font-size: 12px;
+  }
+  .receipt-meta summary {
+    font-size: 12px;
+  }
+}
 .report-values {
   margin: 10px 0;
 }

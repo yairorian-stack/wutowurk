@@ -77,6 +77,10 @@ export function DailyEditor({
     laborRemainder: report ? String(report.laborMinutes % 60) : "0",
     memo: report?.memo ?? "",
     countedCash: report?.countedCash == null ? "" : String(report.countedCash),
+    voucherCount:
+      report?.voucherCount == null ? "" : String(report.voucherCount),
+    voucherDiscount:
+      report?.voucherDiscount == null ? "" : String(report.voucherDiscount),
   });
   const [error, setError] = useState("");
   function submit(e: FormEvent) {
@@ -96,6 +100,14 @@ export function DailyEditor({
           form.countedCash === ""
             ? null
             : integer(form.countedCash, "実際の現金残高"),
+        voucherCount:
+          form.voucherCount === ""
+            ? undefined
+            : integer(form.voucherCount, "割引券の使用枚数"),
+        voucherDiscount:
+          form.voucherDiscount === ""
+            ? undefined
+            : integer(form.voucherDiscount, "割引券の割引額"),
       };
       updateFinance((s) =>
         saveDaily(
@@ -244,6 +256,46 @@ export function DailyEditor({
             onChange={(e) => setForm({ ...form, memo: e.target.value })}
           />
         </label>
+        <fieldset className="labor-input voucher-input">
+          <legend>割引券の記録（任意）</legend>
+          <div className="form-row">
+            <label>
+              使用枚数（枚）
+              <input
+                aria-label="割引券の使用枚数"
+                type="number"
+                min={0}
+                max={100000}
+                step={1}
+                inputMode="numeric"
+                placeholder="未記録"
+                value={form.voucherCount}
+                onChange={(e) =>
+                  setForm({ ...form, voucherCount: e.target.value })
+                }
+              />
+            </label>
+            <label>
+              割引額（円）
+              <input
+                aria-label="割引券の割引額"
+                type="number"
+                min={0}
+                max={100000000}
+                step={1}
+                inputMode="numeric"
+                placeholder="未記録"
+                value={form.voucherDiscount}
+                onChange={(e) =>
+                  setForm({ ...form, voucherDiscount: e.target.value })
+                }
+              />
+            </label>
+          </div>
+          <p>
+            使用しなかった日は両方0。売上には割引後の金額を入力します。割引額は現金残高に含めず、売上から再度差し引きません。
+          </p>
+        </fieldset>
         <details className="reflection-fields">
           <summary>閉店時の現金を確認する（任意）</summary>
           <div className="reflection-content">
@@ -299,9 +351,13 @@ export function CashEditor({
   const [form, setForm] = useState({
     date: movement?.date ?? date,
     direction: movement?.direction ?? "出金",
-    category: movement?.category ?? "仕入",
+    category: movement?.category ?? "仕入れ",
     amount: movement ? String(movement.amount) : "",
     description: movement?.description ?? "",
+    customCategory: movement?.customCategory ?? "",
+    receiptAmount:
+      movement?.receiptAmount == null ? "" : String(movement.receiptAmount),
+    receiptDescription: movement?.receiptDescription ?? "",
   });
   const [error, setError] = useState("");
   function submit(e: FormEvent) {
@@ -311,6 +367,13 @@ export function CashEditor({
         ...form,
         storeId,
         amount: integer(form.amount, "金額"),
+        customCategory:
+          form.category === "自由項目" ? form.customCategory : undefined,
+        receiptAmount:
+          form.receiptAmount === ""
+            ? null
+            : integer(form.receiptAmount, "レシート金額"),
+        receiptDescription: form.receiptDescription,
       };
       updateFinance((s) =>
         saveCash(
@@ -376,12 +439,29 @@ export function CashEditor({
               value={form.category}
               onChange={(e) => setForm({ ...form, category: e.target.value })}
             >
-              {cashCategories[form.direction].map((c) => (
-                <option key={c}>{c}</option>
-              ))}
+              {cashCategories[form.direction]
+                .filter((c) => c !== "仕入" || snapshot?.category === "仕入")
+                .map((c) => (
+                  <option key={c}>{c}</option>
+                ))}
             </select>
           </label>
         </div>
+        {form.category === "自由項目" && (
+          <label>
+            自由項目の名称
+            <input
+              aria-label="自由項目の名称"
+              required
+              maxLength={80}
+              placeholder="例：修繕費、地域イベント費"
+              value={form.customCategory}
+              onChange={(e) =>
+                setForm({ ...form, customCategory: e.target.value })
+              }
+            />
+          </label>
+        )}
         <label>
           金額（円）
           <input
@@ -406,6 +486,41 @@ export function CashEditor({
             onChange={(e) => setForm({ ...form, description: e.target.value })}
           />
         </label>
+        <fieldset className="labor-input receipt-input">
+          <legend>レシートの金額・摘要（任意）</legend>
+          <label>
+            レシート金額（円）
+            <input
+              aria-label="レシート金額"
+              type="number"
+              inputMode="numeric"
+              min={0}
+              max={100000000}
+              step={1}
+              placeholder="未記録"
+              value={form.receiptAmount}
+              onChange={(e) =>
+                setForm({ ...form, receiptAmount: e.target.value })
+              }
+            />
+          </label>
+          <label>
+            レシートの摘要
+            <textarea
+              aria-label="レシートの摘要"
+              rows={2}
+              maxLength={400}
+              placeholder="架空の内容でお試しください"
+              value={form.receiptDescription}
+              onChange={(e) =>
+                setForm({ ...form, receiptDescription: e.target.value })
+              }
+            />
+          </label>
+          <p>
+            レシートはこの明細の参考情報です。レシート金額を追加の出金として二重に計上しません。
+          </p>
+        </fieldset>
         <p className="small muted">
           「銀行入金」は店舗現金からの出金です。キャッシュレス売上の銀行振込は、この現金出納帳には記録しません。
         </p>
@@ -575,6 +690,14 @@ export function ReportValues({ report }: { report: DailyReport }) {
       <div>
         <dt>振り返り</dt>
         <dd>{report.memo || "記入なし"}</dd>
+      </div>
+      <div>
+        <dt>割引券</dt>
+        <dd>
+          {report.voucherCount == null
+            ? "未記録"
+            : `${report.voucherCount}枚 / ${yen(report.voucherDiscount ?? 0)}`}
+        </dd>
       </div>
       <div>
         <dt>実際に数えた店舗現金の残高</dt>

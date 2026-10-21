@@ -21,10 +21,22 @@ export const dailyInputSchema = z
     laborMinutes: z.number().int().min(0).max(600_000),
     memo: z.string().trim().max(1200),
     countedCash: money.nullable(),
+    voucherCount: z.number().int().min(0).max(100_000).optional(),
+    voucherDiscount: money.optional(),
   })
   .refine(
     (d) => d.businessStatus !== "休業" || d.cashSales + d.cashlessSales === 0,
     "休業日の売上は0円にしてください",
+  )
+  .refine(
+    (v) =>
+      (v.voucherCount == null && v.voucherDiscount == null) ||
+      (v.voucherCount != null && v.voucherDiscount != null),
+    "割引券は使用枚数・割引額を両方入力してください",
+  )
+  .refine(
+    (v) => !(v.voucherDiscount && !v.voucherCount),
+    "割引額がある場合は使用枚数を1枚以上で入力してください",
   );
 export const dailySchema = dailyInputSchema.and(
   z.object({
@@ -36,8 +48,17 @@ export const dailySchema = dailyInputSchema.and(
 export type DailyInput = z.infer<typeof dailyInputSchema>;
 export type DailyReport = z.infer<typeof dailySchema>;
 export const cashCategories = {
-  入金: ["釣銭補充", "雑収入", "その他入金"],
-  出金: ["仕入", "消耗品", "銀行入金", "その他支出"],
+  入金: ["釣銭補充", "寄付", "雑収入", "自由項目", "その他入金"],
+  出金: [
+    "仕入れ",
+    "寄付",
+    "支払い",
+    "消耗品",
+    "銀行入金",
+    "自由項目",
+    "その他支出",
+    "仕入",
+  ],
 } as const;
 export const cashInputSchema = z
   .object({
@@ -47,11 +68,24 @@ export const cashInputSchema = z
     category: z.string(),
     amount: money.refine((n) => n > 0, "金額は1円以上で入力してください"),
     description: z.string().trim().min(1, "摘要を入力してください").max(200),
+    customCategory: z.string().trim().max(80).optional(),
+    receiptAmount: money.nullable().optional(),
+    receiptDescription: z.string().trim().max(400).optional(),
   })
   .refine(
     (v) =>
       (cashCategories[v.direction] as readonly string[]).includes(v.category),
     "入出金と区分の組み合わせを確認してください",
+  )
+  .refine(
+    (v) => v.category !== "自由項目" || !!v.customCategory?.trim(),
+    "自由項目の名称を入力してください",
+  )
+  .refine(
+    (v) =>
+      (v.receiptAmount == null && !v.receiptDescription?.trim()) ||
+      (v.receiptAmount != null && !!v.receiptDescription?.trim()),
+    "レシートを記録するときは金額・摘要を両方入力してください",
   );
 export type CashInput = z.infer<typeof cashInputSchema>;
 export const cashSchema = cashInputSchema.and(
@@ -64,6 +98,16 @@ export const cashSchema = cashInputSchema.and(
   }),
 );
 export type CashMovement = z.infer<typeof cashSchema>;
+export function cashCategoryLabel(value: {
+  category: string;
+  customCategory?: string;
+}) {
+  return value.category === "自由項目"
+    ? `自由項目：${value.customCategory ?? ""}`
+    : value.category === "仕入"
+      ? "仕入れ"
+      : value.category;
+}
 export const openingSchema = z.object({
   storeId: store,
   date: dateSchema,
@@ -352,7 +396,7 @@ export function ledger(state: FinanceState, storeId: StoreId): LedgerRow[] {
       .map((m) => ({
         id: m.id,
         date: m.date,
-        category: m.category,
+        category: cashCategoryLabel(m),
         description: m.description,
         receipt: m.direction === "入金" ? m.amount : 0,
         payment: m.direction === "出金" ? m.amount : 0,
