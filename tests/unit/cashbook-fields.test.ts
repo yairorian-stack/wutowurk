@@ -15,6 +15,7 @@ const session = { role: "company" as const, storeId: "honten" as const },
   now = "2026-10-21";
 const fresh = (): FinanceState => ({
   version: 1,
+  targets: [],
   reports: [],
   movements: [],
   openings: [{ storeId: "honten", date: "2026-10-01", amount: 30000 }],

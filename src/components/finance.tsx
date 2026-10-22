@@ -46,6 +46,7 @@ import {
 import { Dialog } from "./dialog";
 import { csvText } from "@/lib/csv";
 import { Empty } from "./ui";
+import { MonthlyTargets, MonthlyTargetEditor } from "./finance-targets";
 
 type Props = {
   session: Session;
@@ -59,6 +60,7 @@ type Modal =
   | { kind: "opening" }
   | { kind: "void"; movement: CashMovement }
   | { kind: "history" }
+  | { kind: "target"; storeId: StoreId }
   | null;
 export function Finance(props: Props) {
   if (
@@ -313,6 +315,12 @@ function FinanceWorkspace({ session, scope, selectStore, notify }: Props) {
       >
         {tab === "monthly" && (
           <>
+            <MonthlyTargets
+              state={state}
+              ids={ids}
+              month={month}
+              edit={(storeId) => setModal({ kind: "target", storeId })}
+            />
             <div className="finance-period">
               <CalendarDays size={17} />
               <div>
@@ -352,7 +360,7 @@ function FinanceWorkspace({ session, scope, selectStore, notify }: Props) {
                 zeroPrior={summary.prior.minutes === 0}
               />
               <Kpi
-                label="人時売上"
+                label="人時売上高"
                 value={
                   summary.current.productivity == null
                     ? "—"
@@ -611,6 +619,12 @@ function FinanceWorkspace({ session, scope, selectStore, notify }: Props) {
           report={state.reports.find(
             (r) => r.storeId === storeId && r.date === modal.date,
           )}
+          movements={state.movements.filter(
+            (m) => m.storeId === storeId && m.date === modal.date && !m.voided,
+          )}
+          target={state.targets.find(
+            (t) => t.storeId === storeId && t.month === modal.date.slice(0, 7),
+          )}
           storeId={storeId}
           date={modal.date}
           changeDate={(date) => setModal({ kind: "daily", date })}
@@ -629,6 +643,25 @@ function FinanceWorkspace({ session, scope, selectStore, notify }: Props) {
           session={session}
           close={() => setModal(null)}
           saved={() => saved("現金明細を保存しました")}
+        />
+      )}
+      {modal?.kind === "target" && (
+        <MonthlyTargetEditor
+          key={`${modal.storeId}-${month}`}
+          target={state.targets.find(
+            (t) => t.storeId === modal.storeId && t.month === month,
+          )}
+          previous={state.targets.find(
+            (t) =>
+              t.storeId === modal.storeId && t.month === monthShift(month, -1),
+          )}
+          storeId={modal.storeId}
+          month={month}
+          session={session}
+          close={() => setModal(null)}
+          saved={() =>
+            saved("月次目標を保存しました。日報の実績から進捗を自動計算します")
+          }
         />
       )}
       {modal?.kind === "opening" && (
@@ -1164,7 +1197,7 @@ function FinanceHistory({
 }) {
   return (
     <Dialog
-      title="日報・出納帳の変更履歴"
+      title="日報・出納帳・月次目標の変更履歴"
       subtitle="元の内容と、変更・取消の内容を記録します。"
       close={close}
       wide
@@ -1213,6 +1246,23 @@ function FinanceHistory({
 }
 function FinanceAuditValues({ data }: { data: FinanceAudit["before"] }) {
   if (!data) return <p>新規登録</p>;
+  if ("salesTarget" in data)
+    return (
+      <dl className="report-values">
+        <div>
+          <dt>対象月</dt>
+          <dd>{data.month}</dd>
+        </div>
+        <div>
+          <dt>月間売上目標</dt>
+          <dd>{yen(data.salesTarget)}</dd>
+        </div>
+        <div>
+          <dt>人時売上高目標</dt>
+          <dd>{yen(data.productivityTarget)} / 人時</dd>
+        </div>
+      </dl>
+    );
   if ("cashSales" in data) return <ReportValues report={data} />;
   if ("direction" in data)
     return (

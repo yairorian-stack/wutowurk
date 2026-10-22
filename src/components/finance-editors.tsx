@@ -6,7 +6,7 @@ import {
   cashCategories,
   hours,
   saveCash,
-  saveDaily,
+  saveDailyEntry,
   saveOpening,
   voidCash,
   yen,
@@ -14,9 +14,11 @@ import {
   type CashMovement,
   type DailyReport,
   type Opening,
+  type MonthlyTarget,
 } from "@/lib/finance";
 import { updateFinance } from "@/lib/finance-store";
 import { Dialog } from "./dialog";
+import { cashDrafts, cashEdits, DailyCashFields } from "./daily-cash-fields";
 
 const demoNotice = (
   <div className="info-note">
@@ -53,6 +55,8 @@ function Footer({
 
 export function DailyEditor({
   report,
+  movements,
+  target,
   storeId,
   date,
   changeDate,
@@ -61,6 +65,8 @@ export function DailyEditor({
   saved,
 }: {
   report?: DailyReport;
+  movements: CashMovement[];
+  target?: MonthlyTarget;
   storeId: StoreId;
   date: string;
   changeDate: (d: string) => void;
@@ -69,6 +75,7 @@ export function DailyEditor({
   saved: () => void;
 }) {
   const [snapshot] = useState(report);
+  const [cashRows, setCashRows] = useState(() => cashDrafts(movements));
   const [form, setForm] = useState({
     businessStatus: report?.businessStatus ?? "営業",
     cashSales: report ? String(report.cashSales) : "",
@@ -110,10 +117,11 @@ export function DailyEditor({
             : integer(form.voucherDiscount, "割引券の割引額"),
       };
       updateFinance((s) =>
-        saveDaily(
+        saveDailyEntry(
           s,
           session,
           input,
+          cashEdits(cashRows, storeId, date),
           snapshot
             ? { id: snapshot.id, revision: snapshot.revision }
             : undefined,
@@ -127,6 +135,9 @@ export function DailyEditor({
   }
   const total =
     (Number(form.cashSales) || 0) + (Number(form.cashlessSales) || 0);
+  const laborMinutes =
+    Number(form.laborHours) * 60 + Number(form.laborRemainder);
+  const productivity = laborMinutes > 0 ? (total * 60) / laborMinutes : null;
   return (
     <Dialog
       title={snapshot ? "1日の日報を編集" : "1日の日報をつける"}
@@ -136,6 +147,12 @@ export function DailyEditor({
     >
       <form className="editor-form" onSubmit={submit}>
         {demoNotice}
+        <div className="daily-auto-note">
+          <Check size={18} />
+          <p>
+            この日報を保存すると、現金出納帳・月間売上・総労働時間・人時売上高へまとめて反映します。
+          </p>
+        </div>
         <div className="form-row">
           <label>
             営業日
@@ -246,6 +263,20 @@ export function DailyEditor({
             例：4人がそれぞれ6時間勤務した日は「24時間」。24時間を超える合計も記録できます。
           </p>
         </fieldset>
+        <div className="daily-productivity-preview">
+          <span>
+            この日の人時売上高
+            <strong>
+              {productivity == null ? "未算出" : `${yen(productivity)} / 人時`}
+            </strong>
+          </span>
+          <p>
+            {target
+              ? `月次目標 ${yen(target.productivityTarget)} / 人時`
+              : "月次目標を設定すると、月間の進捗も確認できます。"}{" "}
+            日別の数値は参考値です。
+          </p>
+        </div>
         <label>
           1日のメモ・振り返り
           <textarea
@@ -296,6 +327,7 @@ export function DailyEditor({
             使用しなかった日は両方0。売上には割引後の金額を入力します。割引額は現金残高に含めず、売上から再度差し引きません。
           </p>
         </fieldset>
+        <DailyCashFields rows={cashRows} change={setCashRows} />
         <details className="reflection-fields">
           <summary>閉店時の現金を確認する（任意）</summary>
           <div className="reflection-content">

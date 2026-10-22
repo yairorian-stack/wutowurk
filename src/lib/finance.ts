@@ -11,6 +11,28 @@ import {
 
 const money = z.number().int().min(0).max(100_000_000);
 const store = z.enum(["honten", "816"]);
+export const monthSchema = z
+  .string()
+  .regex(/^\d{4}-(0[1-9]|1[0-2])$/)
+  .refine(
+    (m) => Number(m.slice(0, 4)) >= 1900 && Number(m.slice(0, 4)) <= 2200,
+  );
+export const monthlyTargetInputSchema = z.object({
+  storeId: store,
+  month: monthSchema,
+  salesTarget: money.refine(
+    (n) => n > 0,
+    "売上目標は1円以上で入力してください",
+  ),
+  productivityTarget: z.number().int().min(1).max(1_000_000),
+});
+export const monthlyTargetSchema = monthlyTargetInputSchema.extend({
+  id: z.string(),
+  revision: z.number().int().positive(),
+  updatedAt: z.string(),
+});
+export type MonthlyTargetInput = z.infer<typeof monthlyTargetInputSchema>;
+export type MonthlyTarget = z.infer<typeof monthlyTargetSchema>;
 export const dailyInputSchema = z
   .object({
     storeId: store,
@@ -121,8 +143,10 @@ export const financeAuditSchema = z.object({
   storeId: store,
   operation: z.string(),
   entityId: z.string(),
-  before: z.union([dailySchema, cashSchema, openingSchema]).nullable(),
-  after: z.union([dailySchema, cashSchema, openingSchema]),
+  before: z
+    .union([dailySchema, cashSchema, openingSchema, monthlyTargetSchema])
+    .nullable(),
+  after: z.union([dailySchema, cashSchema, openingSchema, monthlyTargetSchema]),
 });
 export type FinanceAudit = z.infer<typeof financeAuditSchema>;
 export const financeSchema = z
@@ -132,6 +156,7 @@ export const financeSchema = z
     movements: z.array(cashSchema),
     openings: z.array(openingSchema),
     history: z.array(financeAuditSchema),
+    targets: z.array(monthlyTargetSchema).default([]),
   })
   .superRefine((state, context) => {
     const days = new Set<string>(),
@@ -162,6 +187,17 @@ export const financeSchema = z
           message: "店舗の開始残高が重複しています",
         });
       balances.add(opening.storeId);
+    }
+    const targetKeys = new Set<string>();
+    for (const target of state.targets) {
+      const key = `${target.storeId}:${target.month}`;
+      if (targetKeys.has(key) || ids.has(target.id))
+        context.addIssue({
+          code: "custom",
+          message: "月次目標の店舗・月またはIDが重複しています",
+        });
+      targetKeys.add(key);
+      ids.add(target.id);
     }
   });
 export type FinanceState = z.infer<typeof financeSchema>;
@@ -293,6 +329,94 @@ export function saveCash(
     ],
   };
 }
+export type CashEdit = {
+  input: CashInput;
+  edit?: { id: string; revision: number };
+};
+
+// Compute the complete update before localStorage is written by updateFinance.
+export function saveDailyEntry(
+  state: FinanceState,
+  session: Session,
+  input: DailyInput,
+  cashEntries: CashEdit[],
+  edit?: { id: string; revision: number },
+  now = today(),
+): FinanceState {
+  let next = saveDaily(state, session, input, edit, now);
+  const ids = new Set<string>();
+  for (const [index, entry] of cashEntries.entries()) {
+    try {
+      if (
+        entry.input.storeId !== input.storeId ||
+        entry.input.date !== input.date
+      )
+        throw new Error("日報と同じ店舗・日付の明細を指定してください");
+      if (entry.edit) {
+        const old = state.movements.find((m) => m.id === entry.edit!.id);
+        if (!old || old.date !== input.date || old.storeId !== input.storeId)
+          throw new Error("この日の明細ではありません");
+        if (ids.has(entry.edit.id)) throw new Error("同じ明細が重複しています");
+        ids.add(entry.edit.id);
+      }
+      next = saveCash(next, session, entry.input, entry.edit, now);
+    } catch (error) {
+      throw new Error(
+        `現金明細${index + 1}：${error instanceof Error ? error.message : "入力を確認してください"}`,
+      );
+    }
+  }
+  return next;
+}
+
+export function saveMonthlyTarget(
+  state: FinanceState,
+  session: Session,
+  input: MonthlyTargetInput,
+  edit?: { id: string; revision: number },
+): FinanceState {
+  const parsed = monthlyTargetInputSchema.safeParse(input);
+  if (!parsed.success)
+    throw new Error("対象月と、1以上の整数の目標を入力してください");
+  const data = parsed.data;
+  assertEdit(session, data.storeId);
+  const old = edit ? state.targets.find((t) => t.id === edit.id) : undefined;
+  if (edit && (!old || old.revision !== edit.revision))
+    throw new Error("ほかの画面で目標が変更されました。開き直してください");
+  if (old && (old.storeId !== data.storeId || old.month !== data.month))
+    throw new Error("既存の目標の店舗・月は変更できません");
+  if (
+    !edit &&
+    state.targets.some(
+      (t) => t.storeId === data.storeId && t.month === data.month,
+    )
+  )
+    throw new Error("この月の目標は設定済みです。開き直してください");
+  const target: MonthlyTarget = {
+    ...data,
+    id: old?.id ?? crypto.randomUUID(),
+    revision: (old?.revision ?? 0) + 1,
+    updatedAt: new Date().toISOString(),
+  };
+  return {
+    ...state,
+    targets: old
+      ? state.targets.map((t) => (t.id === old.id ? target : t))
+      : [...state.targets, target],
+    history: [
+      event(
+        session,
+        data.storeId,
+        old ? "月次目標を更新" : "月次目標を設定",
+        target.id,
+        old ?? null,
+        target,
+      ),
+      ...state.history,
+    ],
+  };
+}
+
 export function voidCash(
   state: FinanceState,
   session: Session,
@@ -428,12 +552,6 @@ export function balanceAt(
   );
   return rows.at(-1)?.balance ?? opening.amount;
 }
-export const monthSchema = z
-  .string()
-  .regex(/^\d{4}-(0[1-9]|1[0-2])$/)
-  .refine(
-    (m) => Number(m.slice(0, 4)) >= 1900 && Number(m.slice(0, 4)) <= 2200,
-  );
 export function monthDays(month: string) {
   return new Date(
     Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0),
@@ -549,6 +667,7 @@ export function createFinanceSeed(now = today()): FinanceState {
     prior = `${year - 1}${month.slice(4)}`;
   const state: FinanceState = {
     version: 1,
+    targets: [],
     reports: [],
     movements: [],
     openings: stores.map((s) => ({
