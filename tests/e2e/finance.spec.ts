@@ -1,4 +1,5 @@
-import { expect, test } from "@playwright/test";
+import { expect } from "@playwright/test";
+import { test } from "./finance-fixture";
 import { readFile } from "node:fs/promises";
 import { today } from "../../src/lib/domain";
 import { createFinanceSeed, monthShift, yen } from "../../src/lib/finance";

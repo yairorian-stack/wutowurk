@@ -47,6 +47,7 @@ import { Dialog } from "./dialog";
 import { csvText } from "@/lib/csv";
 import { Empty } from "./ui";
 import { MonthlyTargets, MonthlyTargetEditor } from "./finance-targets";
+import { FinanceDataMode } from "./finance-data-mode";
 
 type Props = {
   session: Session;
@@ -77,7 +78,11 @@ export function Finance(props: Props) {
         </p>
       </section>
     );
-  return <FinanceWorkspace {...props} />;
+  return (
+    <FinanceDataMode scope={props.scope}>
+      <FinanceWorkspace {...props} />
+    </FinanceDataMode>
+  );
 }
 function FinanceWorkspace({ session, scope, selectStore, notify }: Props) {
   const state = useFinance();
@@ -102,8 +107,9 @@ function FinanceWorkspace({ session, scope, selectStore, notify }: Props) {
   function csv(kind: "reports" | "cash") {
     if (kind === "reports")
       downloadCsv(
-        `日報-${scope}-${month}.csv`,
+        `確認用-日報-${scope}-${month}.csv`,
         [
+          "データ区分",
           "店舗",
           "日付",
           "営業状況",
@@ -117,6 +123,7 @@ function FinanceWorkspace({ session, scope, selectStore, notify }: Props) {
           "割引券割引額（円）",
         ],
         reports.map((r) => [
+          "確認用（実績未照合）",
           storeName(r.storeId),
           r.date,
           r.businessStatus,
@@ -133,8 +140,9 @@ function FinanceWorkspace({ session, scope, selectStore, notify }: Props) {
     else if (scope !== "all") {
       const rows = ledger(state, scope).filter((r) => r.date.startsWith(month));
       downloadCsv(
-        `現金出納帳-${scope}-${month}.csv`,
+        `確認用-現金出納帳-${scope}-${month}.csv`,
         [
+          "データ区分",
           "店舗",
           "日付",
           "区分",
@@ -150,6 +158,7 @@ function FinanceWorkspace({ session, scope, selectStore, notify }: Props) {
         ],
         [
           [
+            "確認用（実績未照合）",
             storeName(scope),
             `${month}-01`,
             "月初繰越",
@@ -164,6 +173,7 @@ function FinanceWorkspace({ session, scope, selectStore, notify }: Props) {
             "",
           ],
           ...rows.map((r) => [
+            "確認用（実績未照合）",
             storeName(scope),
             r.date,
             r.category,
@@ -180,6 +190,7 @@ function FinanceWorkspace({ session, scope, selectStore, notify }: Props) {
           ...reports
             .filter((r) => r.voucherCount != null && r.voucherDiscount != null)
             .map((r) => [
+              "確認用（実績未照合）",
               storeName(scope),
               r.date,
               "割引券（参考）",
@@ -217,7 +228,7 @@ function FinanceWorkspace({ session, scope, selectStore, notify }: Props) {
       <div className="finance-demo-note">
         <Info size={20} />
         <div>
-          <strong>ここはサンプルを試す画面です</strong>
+          <strong>実績データの取込・照合は未完了です</strong>
           <p>
             実際の売上・帳簿・社内情報は入力しないでください。記録はこのブラウザー内のみで保存され、店舗間・端末間では共有されません。
           </p>
@@ -344,7 +355,7 @@ function FinanceWorkspace({ session, scope, selectStore, notify }: Props) {
             </div>
             <div className="finance-kpis">
               <Kpi
-                label="累計売上（税込）"
+                label="確認用の累計売上（税込）"
                 value={yen(summary.current.sales)}
                 prior={yen(summary.prior.sales)}
                 change={summary.salesChange}

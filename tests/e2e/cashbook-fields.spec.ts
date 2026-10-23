@@ -1,4 +1,5 @@
-import { expect, test } from "@playwright/test";
+import { expect } from "@playwright/test";
+import { test } from "./finance-fixture";
 import { today } from "../../src/lib/domain";
 import { monthShift, yen } from "../../src/lib/finance";
 import { readFile } from "node:fs/promises";
@@ -48,7 +49,10 @@ test("割引券の枚数・割引額を出納帳から記録し、現金と売�
   page,
 }) => {
   await page.goto("/daily");
-  const beforeSales = (await page.locator(".finance-kpi").first().textContent())!;
+  const beforeSales = (await page
+    .locator(".finance-kpi")
+    .first()
+    .textContent())!;
   await page.getByRole("tab", { name: "現金出納帳", exact: true }).click();
   const beforeBalance = (await page
     .locator(".cash-summary>div")
