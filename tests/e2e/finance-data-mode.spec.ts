@@ -1,14 +1,63 @@
 import { expect, test } from "@playwright/test";
 import { createFinanceSeed } from "../../src/lib/finance";
 import { createSeed } from "../../src/lib/seed";
+import { REPORTED_SALES_ELEMENT_ID } from "../../src/lib/reported-sales";
 
-test("実データ未取込時は架空の累計や0円を実績として表示しない", async ({
+test("提供済み月累計を店舗別・全社で表示し、日報や現金残高を捏造しない", async ({
+  page,
+}) => {
+  const data = {
+    month: "2026-10",
+    as_of_sales_date: "2026-10-22",
+    stores: [
+      { store_id: "honten", sales_jpy: 100000 },
+      { store_id: "816", sales_jpy: 200000 },
+    ],
+  };
+  await page.route("**/daily", async (route) => {
+    const response = await route.fetch();
+    const body = (await response.text()).replace(
+      "</head>",
+      `<script id="${REPORTED_SALES_ELEMENT_ID}" type="application/json">${JSON.stringify(data)}</script></head>`,
+    );
+    await route.fulfill({ response, body });
+  });
+  await page.goto("/daily");
+  await expect(page.getByText("ご提示の月累計", { exact: true })).toBeVisible();
+  await expect(page.locator(".reported-sales-amount")).toContainText("100,000");
+  await expect(page.locator(".finance-not-connected")).toContainText(
+    "2026-10-22",
+  );
+  await expect(page.locator(".finance-unavailable-values")).toContainText(
+    "未取込",
+  );
+  await expect(page.locator(".finance-unavailable-values")).toContainText(
+    "未照合",
+  );
+  await page.getByLabel("表示する店舗").selectOption("all");
+  await expect(page.locator(".reported-sales-amount")).toContainText("300,000");
+  await page.getByLabel("表示する店舗").selectOption("816");
+  await expect(page.locator(".reported-sales-amount")).toContainText("200,000");
+  expect(
+    await page.evaluate(() =>
+      localStorage.getItem("wuto-wurk-finance-demo-v1"),
+    ),
+  ).toBeNull();
+  await page.setViewportSize({ width: 320, height: 900 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+});
+
+test("ポータル未反映時は架空の累計や0円を実績として表示しない", async ({
   page,
 }) => {
   await page.goto("/daily");
-  await expect(page.getByText("実データ未取込", { exact: true })).toBeVisible();
+  await expect(page.getByText("ポータル未反映", { exact: true })).toBeVisible();
   await expect(page.locator(".finance-unavailable-values")).toContainText(
-    "未集計",
+    "未反映",
   );
   await expect(page.locator(".finance-unavailable-values")).not.toContainText(
     /[￥¥]/,
@@ -28,7 +77,7 @@ test("実データ未取込時は架空の累計や0円を実績として表示�
   ).toBe(true);
 });
 
-test("保存済みデータを消さず、確認用の表示とCSVを明示し、実データ未取込に戻れる", async ({
+test("保存済みデータを消さず、確認用の表示とCSVを明示し、ポータル未反映に戻れる", async ({
   page,
 }) => {
   const finance = createFinanceSeed("2026-10-22");
@@ -46,7 +95,7 @@ test("保存済みデータを消さず、確認用の表示とCSVを明示し�
     { financeRaw, portalRaw },
   );
   await page.goto("/daily");
-  await expect(page.getByText("実データ未取込", { exact: true })).toBeVisible();
+  await expect(page.getByText("ポータル未反映", { exact: true })).toBeVisible();
   await expect(page.locator(".finance-kpi")).toHaveCount(0);
   await page
     .getByRole("button", { name: "サンプルで操作を試す", exact: true })
@@ -74,7 +123,7 @@ test("保存済みデータを消さず、確認用の表示とCSVを明示し�
   await page
     .getByRole("button", { name: "サンプルを閉じる", exact: true })
     .click();
-  await expect(page.getByText("実データ未取込", { exact: true })).toBeVisible();
+  await expect(page.getByText("ポータル未反映", { exact: true })).toBeVisible();
   await page.reload();
   await expect(page.locator(".finance-kpi")).toHaveCount(0);
   expect(

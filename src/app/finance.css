@@ -77,6 +77,10 @@
   color: #405d40;
   margin-top: 12px;
 }
+.finance-unavailable-values .reported-sales-amount {
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
 .finance-connection-note {
   display: flex;
   gap: 10px;
@@ -131,6 +135,7 @@
   }
   .finance-unavailable-values > div {
     display: flex;
+    flex-wrap: wrap;
     justify-content: space-between;
     align-items: center;
     gap: 15px;

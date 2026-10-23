@@ -2,6 +2,8 @@
 import { useState } from "react";
 import { Database, FlaskConical, Info } from "lucide-react";
 import { stores, type StoreId } from "@/lib/domain";
+import { yen } from "@/lib/finance";
+import { readReportedSales } from "@/lib/reported-sales";
 
 const SAMPLE_SESSION_KEY = "wuto-wurk-finance-sample-session-v1";
 function sampleIsOpen() {
@@ -20,7 +22,8 @@ export function FinanceDataMode({
   scope: StoreId | "all";
   children: React.ReactNode;
 }) {
-  const [sample, setSample] = useState(sampleIsOpen);
+  const [reported] = useState(readReportedSales);
+  const [sample, setSample] = useState(() => !reported && sampleIsOpen());
   function chooseSample(open: boolean) {
     try {
       if (open) sessionStorage.setItem(SAMPLE_SESSION_KEY, "open");
@@ -53,13 +56,18 @@ export function FinanceDataMode({
     );
   const storeName =
     scope === "all" ? "全店舗" : stores.find((s) => s.id === scope)!.short;
+  const reportedAmount = reported?.stores
+    .filter((s) => scope === "all" || s.store_id === scope)
+    .reduce((sum, s) => sum + s.sales_jpy, 0);
   return (
     <>
       <div className="page-intro finance-intro">
         <div>
           <p className="eyebrow">SALES / DAILY REPORT / CASHBOOK</p>
           <h1>売上・日報・現金出納帳</h1>
-          <p className="muted">{storeName}のデータ接続状況</p>
+          <p className="muted">
+            {storeName}の{reported ? "月累計" : "データ連携状況"}
+          </p>
         </div>
       </div>
       <section
@@ -69,23 +77,31 @@ export function FinanceDataMode({
         <div className="finance-connection-heading">
           <Database size={30} />
           <div>
-            <span className="finance-connection-badge">実データ未取込</span>
+            <span className="finance-connection-badge">
+              {reported ? "ご提示の月累計" : "ポータル未反映"}
+            </span>
             <h2 id="finance-connection-title">
-              実際の売上は、まだ集計されていません。
+              {reported
+                ? `${reported.month} の売上累計`
+                : "元の集計結果は、まだポータルへ反映されていません。"}
             </h2>
           </div>
         </div>
         <p>
-          この確認用サイトには、店舗の出納帳・売上データが接続されていません。スプレッドシートの数値との照合も未完了です。
+          {reported
+            ? `${reported.as_of_sales_date} までの累計です。出典：依頼者提供。日別データとの照合は未完了です。`
+            : "スプレッドシート側で集計済みでも、このサイトにはまだ自動反映されません。月累計の転記と、日別出納帳の照合を分けて確認します。"}
         </p>
         <dl className="finance-unavailable-values">
           <div>
             <dt>累計売上</dt>
-            <dd>未集計</dd>
+            <dd className={reported ? "reported-sales-amount" : undefined}>
+              {reportedAmount == null ? "未反映" : yen(reportedAmount)}
+            </dd>
           </div>
           <div>
             <dt>総労働時間・人時売上高</dt>
-            <dd>未集計</dd>
+            <dd>未取込</dd>
           </div>
           <div>
             <dt>現金出納帳の残高</dt>
@@ -95,7 +111,9 @@ export function FinanceDataMode({
         <p className="finance-connection-note">
           <Info size={18} />
           <span>
-            未取込は「売上0円」ではありません。実データの取込・照合後に、実績として表示します。
+            {reported
+              ? "この月累計を日報や現金入金へ加算する処理は行っていません。労働時間・現金残高は日別データから別途確認します。"
+              : "「未反映」は元のシートが未集計、または売上0円という意味ではありません。提供済みの月累計は、日別データと分けて表示できます。"}
           </span>
         </p>
         <div className="finance-sample-choice">
@@ -114,7 +132,7 @@ export function FinanceDataMode({
           </button>
         </div>
         <p className="small muted">
-          実際の店舗データを扱うには、個人ログイン・非公開の保存先・バックアップが必要です。
+          日報・出納帳をスタッフ間で共有する本番運用には、個人ログイン・非公開の保存先・バックアップが必要です。
         </p>
       </section>
     </>
