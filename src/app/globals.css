@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "./finance.css";
+@import "./self-evaluation.css";
 
 @theme inline {
   --color-forest: #29473b;

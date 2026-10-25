@@ -7,6 +7,7 @@ import {
   Bell,
   BookOpen,
   CalendarCheck2,
+  ClipboardCheck,
   Check,
   ChevronRight,
   CircleHelp,
@@ -48,6 +49,7 @@ import { VisionMap } from "./vision";
 import { Library } from "./library";
 import { Settings } from "./settings";
 import { Finance } from "./finance";
+import { SelfEvaluation } from "./self-evaluation";
 import { Dialog } from "./dialog";
 import { GoalEditor } from "./goal-editor";
 import { Empty, StatusBadge } from "./ui";
@@ -81,6 +83,13 @@ const navigation = [
     label: "社内資料",
     subtitle: "LIBRARY",
     icon: BookOpen,
+  },
+  {
+    id: "self-evaluation",
+    href: "/self-evaluation",
+    label: "自己評価",
+    subtitle: "SELF REFLECTION",
+    icon: ClipboardCheck,
   },
 ] as const;
 type View = (typeof navigation)[number]["id"] | "settings";
@@ -296,7 +305,9 @@ function PortalContent({ view }: { view: View }) {
             <span className="prototype-dot" />
             体験版
             <span className="prototype-label-text">
-              架空のサンプルデータ / このブラウザー内に保存
+              {view === "self-evaluation"
+                ? "自己評価は送信・自動保存されません"
+                : "架空のサンプルデータ / このブラウザー内に保存"}
             </span>
             <Link href="/settings">
               {roles[state.session.role]}でプレビュー
@@ -318,12 +329,24 @@ function PortalContent({ view }: { view: View }) {
           )}
           {view === "vision" && <VisionMap state={state} notify={notify} />}
           {view === "daily" && (
-            <Finance
-              session={state.session}
-              scope={scope}
-              selectStore={selectStore}
-              notify={notify}
-            />
+            <>
+              <div className="evaluation-entry-inline">
+                <span>成長を振り返り、次の目標へ。</span>
+                <Link href="/self-evaluation" className="button secondary">
+                  <ClipboardCheck size={18} />
+                  自己評価シートを作成
+                </Link>
+              </div>
+              <Finance
+                session={state.session}
+                scope={scope}
+                selectStore={selectStore}
+                notify={notify}
+              />
+            </>
+          )}
+          {view === "self-evaluation" && (
+            <SelfEvaluation initialStoreId={state.session.storeId} />
           )}
           {view === "library" && (
             <Library

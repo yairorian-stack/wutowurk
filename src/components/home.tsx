@@ -7,6 +7,7 @@ import {
   Check,
   ChevronRight,
   Compass,
+  ClipboardCheck,
   Flag,
   Heart,
   Leaf,
@@ -106,6 +107,18 @@ export function Home({
             <strong>今日の売上と、チームの1日を記録する。</strong>
             <small>店舗別の日報・現金出納帳・月次進捗はこちら</small>
           </span>
+          <ArrowRight size={20} />
+        </Link>
+        <Link href="/self-evaluation" className="evaluation-home-entry">
+          <div>
+            <ClipboardCheck size={24} />
+            <span>
+              <strong>自己評価シートを作成</strong>
+              <small>
+                調理・接客・部門リーダー / 今の成長と次の目標を見つける
+              </small>
+            </span>
+          </div>
           <ArrowRight size={20} />
         </Link>
         <section className="weekly-section" aria-labelledby="weekly-title">

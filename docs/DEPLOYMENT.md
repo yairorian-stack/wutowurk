@@ -14,7 +14,9 @@
 
 その後、依頼者の画面でGitHub Pagesが「Your site is live」、公開元が `gh-pages` / `/(root)` であることを確認した。今回の売上・日報・出納帳サンプルも同じブランチへの更新で反映する。`npm run build:pages` で `out-pages/` に公開物を再生成する。公開URLでの新画面は `https://yairorian-stack.github.io/wutowurk/#/daily`。最新の公開物のコミットはリモートの `gh-pages` HEAD を正とする。
 
-## 残るGitHub側の操作
+自己評価の入力画面は `https://yairorian-stack.github.io/wutowurk/#/self-evaluation`。公開物は未記入のフォームと制度案のみを含み、利用者が入力した氏名・評価・振り返りは公開ファイルへ組み込まない。
+
+## GitHub側の設定（初回のみ・現在は設定済み）
 
 管理者が https://github.com/yairorian-stack/wutowurk/settings/pages を開き、次のように設定する。
 
@@ -22,7 +24,7 @@
 2. Branch: `gh-pages`、フォルダー: `/(root)`
 3. `Save`
 
-有効化とデプロイ完了後の予定URL: https://yairorian-stack.github.io/wutowurk/
+確認用サイトのURL: https://yairorian-stack.github.io/wutowurk/
 
 現在のクラウド環境では `api.github.com` と `yairorian-stack.github.io` への通信がネットワークポリシーで拒否されている。APIによるPages設定変更と外部の公開URLの応答検証は未実行。Git push成功およびgithub.com上の公開用ブランチのファイル表示は確認済み。URLを閲覧可能と断定しない。
 
