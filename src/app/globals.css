@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "./finance.css";
 @import "./self-evaluation.css";
+@import "./local-data.css";
 
 @theme inline {
   --color-forest: #29473b;
@@ -2847,6 +2848,8 @@ h1 {
     padding: 5px 0;
     color: #748365;
     font-size: 10px;
+    min-width: 0;
+    white-space: nowrap;
     position: relative;
   }
   .mobile-nav > a.active {

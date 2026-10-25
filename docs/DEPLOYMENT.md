@@ -16,6 +16,8 @@
 
 自己評価の入力画面は `https://yairorian-stack.github.io/wutowurk/#/self-evaluation`。公開物は未記入のフォームと制度案のみを含み、利用者が入力した氏名・評価・振り返りは公開ファイルへ組み込まない。
 
+シフト画面は `https://yairorian-stack.github.io/wutowurk/#/shifts`。共通CSVの入力画面と明示的に開く架空サンプルのみを公開する。Airシフトからの自動取得は未接続。売上JSON読み込み画面も公開ビルドへ含むが、依頼者の実額JSON・実額入り確認版HTMLはリポジトリ外に保持し、承認なしに公開しない。
+
 ## GitHub側の設定（初回のみ・現在は設定済み）
 
 管理者が https://github.com/yairorian-stack/wutowurk/settings/pages を開き、次のように設定する。

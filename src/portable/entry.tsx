@@ -5,6 +5,7 @@ const routes = {
   "/vision": "vision",
   "/plans": "plans",
   "/daily": "daily",
+  "/shifts": "shifts",
   "/self-evaluation": "self-evaluation",
   "/library": "library",
   "/settings": "settings",

@@ -7,6 +7,7 @@ import {
   Bell,
   BookOpen,
   CalendarCheck2,
+  CalendarDays,
   ClipboardCheck,
   Check,
   ChevronRight,
@@ -50,6 +51,7 @@ import { Library } from "./library";
 import { Settings } from "./settings";
 import { Finance } from "./finance";
 import { SelfEvaluation } from "./self-evaluation";
+import { Shifts } from "./shifts";
 import { Dialog } from "./dialog";
 import { GoalEditor } from "./goal-editor";
 import { Empty, StatusBadge } from "./ui";
@@ -76,6 +78,13 @@ const navigation = [
     label: "売上・日報",
     subtitle: "DAILY RECORD",
     icon: NotebookPen,
+  },
+  {
+    id: "shifts",
+    href: "/shifts",
+    label: "シフト",
+    subtitle: "TEAM SHIFT",
+    icon: CalendarDays,
   },
   {
     id: "library",
@@ -307,7 +316,11 @@ function PortalContent({ view }: { view: View }) {
             <span className="prototype-label-text">
               {view === "self-evaluation"
                 ? "自己評価は送信・自動保存されません"
-                : "架空のサンプルデータ / このブラウザー内に保存"}
+                : view === "shifts"
+                  ? "シフトは送信・自動保存されません"
+                  : view === "daily"
+                    ? "提供売上とサンプルは別々に管理 / 保存はこのブラウザー内"
+                    : "架空のサンプルデータ / このブラウザー内に保存"}
             </span>
             <Link href="/settings">
               {roles[state.session.role]}でプレビュー
@@ -336,6 +349,10 @@ function PortalContent({ view }: { view: View }) {
                   <ClipboardCheck size={18} />
                   自己評価シートを作成
                 </Link>
+                <Link href="/shifts" className="button secondary">
+                  <CalendarDays size={18} />
+                  店舗のシフトを見る
+                </Link>
               </div>
               <Finance
                 session={state.session}
@@ -348,6 +365,7 @@ function PortalContent({ view }: { view: View }) {
           {view === "self-evaluation" && (
             <SelfEvaluation initialStoreId={state.session.storeId} />
           )}
+          {view === "shifts" && <Shifts scope={scope} />}
           {view === "library" && (
             <Library
               role={state.session.role}
@@ -381,7 +399,9 @@ function PortalContent({ view }: { view: View }) {
                 ? "ビジョン"
                 : n.id === "plans"
                   ? "週次目標"
-                  : n.label}
+                  : n.id === "daily"
+                    ? "売上日報"
+                    : n.label}
             </span>
           </Link>
         ))}
