@@ -109,6 +109,16 @@ export function Home({
           </span>
           <ArrowRight size={20} />
         </Link>
+        <Link href="/garbage" className="daily-home-link">
+          <span className="daily-home-icon">
+            <CalendarDays size={23} />
+          </span>
+          <span>
+            <strong>本店ゴミ出し</strong>
+            <small>18番地区の収集予定・通知状況を確認</small>
+          </span>
+          <ArrowRight size={20} />
+        </Link>
         <Link href="/self-evaluation" className="evaluation-home-entry">
           <div>
             <ClipboardCheck size={24} />

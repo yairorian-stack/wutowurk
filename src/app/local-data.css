@@ -13,6 +13,28 @@
   cursor: pointer;
   min-height: 28px;
 }
+.shift-manual {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 20px;
+}
+.shift-manual label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+}
+.shift-manual input,
+.shift-manual select {
+  min-width: 0;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #dfe3d5;
+  border-radius: 8px;
+  background: white;
+  min-height: 44px;
+}
 .shift-import summary small {
   color: #7b8572;
   font-weight: 400;
@@ -332,7 +354,74 @@
 .shift-empty span {
   font-size: 13px;
 }
+.garbage-status,
+.garbage-calendar {
+  padding: 24px;
+  margin-bottom: 24px;
+}
+.garbage-status h2 {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 14px 0;
+}
+.garbage-status p,
+.garbage-calendar > p {
+  line-height: 1.9;
+  margin: 14px 0;
+}
+.garbage-events {
+  list-style: none;
+  padding: 0;
+  margin: 24px 0;
+}
+.garbage-events > li {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  gap: 18px;
+  border-top: 1px solid #e3e7dc;
+  padding: 22px 0;
+}
+.garbage-event-date {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: #4b6b3b;
+}
+.garbage-event-date strong {
+  font-size: 24px;
+}
+.garbage-event-date span {
+  font-size: 13px;
+}
+.garbage-events h3 {
+  font-weight: 600;
+  font-size: 18px;
+  margin-bottom: 8px;
+}
+.garbage-separation {
+  margin-top: 12px;
+  font-size: 13px;
+  line-height: 1.9;
+}
+.garbage-separation summary {
+  cursor: pointer;
+  color: #5c7350;
+}
+.garbage-separation p {
+  margin-top: 8px;
+}
 @media (max-width: 700px) {
+  .garbage-status,
+  .garbage-calendar {
+    padding: 18px 14px;
+  }
+  .garbage-events > li {
+    grid-template-columns: 60px minmax(0, 1fr);
+    gap: 10px;
+  }
+  .shift-manual {
+    grid-template-columns: 1fr;
+  }
   .imported-sales,
   .shift-connection,
   .shift-import,

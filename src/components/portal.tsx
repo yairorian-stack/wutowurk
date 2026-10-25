@@ -52,6 +52,7 @@ import { Settings } from "./settings";
 import { Finance } from "./finance";
 import { SelfEvaluation } from "./self-evaluation";
 import { Shifts } from "./shifts";
+import { Garbage } from "./garbage";
 import { Dialog } from "./dialog";
 import { GoalEditor } from "./goal-editor";
 import { Empty, StatusBadge } from "./ui";
@@ -101,7 +102,7 @@ const navigation = [
     icon: ClipboardCheck,
   },
 ] as const;
-type View = (typeof navigation)[number]["id"] | "settings";
+type View = (typeof navigation)[number]["id"] | "settings" | "garbage";
 type Modal =
   | { kind: "edit"; goalId?: string; storeId: StoreId; week: string }
   | { kind: "detail"; id: string }
@@ -264,7 +265,10 @@ function PortalContent({ view }: { view: View }) {
           <div className="breadcrumb">
             <span>Growth Portal</span>
             <ChevronRight size={13} />
-            <strong>{currentNav?.label ?? "試作品設定"}</strong>
+            <strong>
+              {currentNav?.label ??
+                (view === "garbage" ? "本店ゴミ出し" : "試作品設定")}
+            </strong>
           </div>
           <Link href="/" className="mobile-brand">
             WUTO-WURK<span>GROWTH PORTAL</span>
@@ -318,9 +322,11 @@ function PortalContent({ view }: { view: View }) {
                 ? "自己評価は送信・自動保存されません"
                 : view === "shifts"
                   ? "シフトは送信・自動保存されません"
-                  : view === "daily"
-                    ? "提供売上とサンプルは別々に管理 / 保存はこのブラウザー内"
-                    : "架空のサンプルデータ / このブラウザー内に保存"}
+                  : view === "garbage"
+                    ? "提供日程の確認用 / 自動通知は未稼働"
+                    : view === "daily"
+                      ? "提供売上とサンプルは別々に管理 / 保存はこのブラウザー内"
+                      : "架空のサンプルデータ / このブラウザー内に保存"}
             </span>
             <Link href="/settings">
               {roles[state.session.role]}でプレビュー
@@ -353,6 +359,9 @@ function PortalContent({ view }: { view: View }) {
                   <CalendarDays size={18} />
                   店舗のシフトを見る
                 </Link>
+                <Link href="/garbage" className="button secondary">
+                  本店ゴミ出し
+                </Link>
               </div>
               <Finance
                 session={state.session}
@@ -366,6 +375,7 @@ function PortalContent({ view }: { view: View }) {
             <SelfEvaluation initialStoreId={state.session.storeId} />
           )}
           {view === "shifts" && <Shifts scope={scope} />}
+          {view === "garbage" && <Garbage />}
           {view === "library" && (
             <Library
               role={state.session.role}

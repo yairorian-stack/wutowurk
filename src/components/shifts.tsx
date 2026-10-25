@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import {
   CalendarDays,
   Clock3,
@@ -15,9 +15,12 @@ import {
   parseShiftCsv,
   shiftTime,
   shiftTotals,
+  timeMinutes,
+  validateShifts,
   type Shift,
 } from "@/lib/shifts";
 import { downloadText } from "@/lib/download";
+import { csvText } from "@/lib/csv";
 
 export function Shifts({ scope }: { scope: StoreId | "all" }) {
   const [shifts, setShifts] = useState<Shift[]>([]);
@@ -26,6 +29,60 @@ export function Shifts({ scope }: { scope: StoreId | "all" }) {
   const [importedAt, setImportedAt] = useState("");
   const [error, setError] = useState("");
   const [sample, setSample] = useState(false);
+  const [manualError, setManualError] = useState("");
+  function addManual(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const values = new FormData(event.currentTarget);
+    try {
+      const next = validateShifts([
+        ...(sample ? [] : shifts),
+        {
+          storeId: scope === "all" ? values.get("store") : scope,
+          date: values.get("date"),
+          label: values.get("label"),
+          start: timeMinutes(String(values.get("start"))),
+          end: timeMinutes(String(values.get("end")), true),
+          breakMinutes: Number(values.get("rest")),
+        },
+      ]);
+      setShifts(next);
+      setSample(false);
+      setManualError("");
+      const d = String(values.get("date"));
+      setDate(d);
+      setMonth(d.slice(0, 7));
+      setImportedAt(
+        new Intl.DateTimeFormat("ja-JP", {
+          timeZone: "Asia/Tokyo",
+          dateStyle: "short",
+          timeStyle: "short",
+        }).format(new Date()),
+      );
+    } catch (e) {
+      setManualError(
+        e instanceof Error ? e.message : "勤務予定を追加できません",
+      );
+    }
+  }
+  function backup() {
+    const textTime = (m: number) =>
+      `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+    downloadText(
+      `${sample ? "確認用-" : ""}WUTO-WURK-シフト.csv`,
+      csvText(
+        ["店舗", "日付", "表示名", "開始", "終了", "休憩分"],
+        shifts.map((s) => [
+          s.storeId,
+          s.date,
+          s.label,
+          textTime(s.start),
+          textTime(s.end),
+          s.breakMinutes,
+        ]),
+      ),
+      "text/csv;charset=utf-8",
+    );
+  }
   const visible = shifts.filter(
     (s) => s.date.startsWith(month) && (scope === "all" || s.storeId === scope),
   );
@@ -115,6 +172,81 @@ export function Shifts({ scope }: { scope: StoreId | "all" }) {
           このリンクを開いてもポータルへ自動同期されません。ログインが必要な場合はAirシフト側で行ってください。
         </p>
       </section>
+      <details className="panel shift-import">
+        <summary>
+          紙のシフトを入力する <small>本店 / 1件ずつ追加</small>
+        </summary>
+        <p>
+          本店の紙の予定表を転記できます。追加は画面内だけに反映し、離れる前にCSVで控えを保存してください。
+        </p>
+        {sample && (
+          <p className="local-data-note">
+            予定を追加すると、架空のサンプルを閉じて入力した予定だけに切り替えます。
+          </p>
+        )}
+        <form className="shift-manual" onSubmit={addManual}>
+          {scope === "all" ? (
+            <label>
+              勤務店舗
+              <select name="store" defaultValue="honten">
+                {stores.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.short}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : (
+            <p>勤務店舗：{stores.find((s) => s.id === scope)?.short}</p>
+          )}
+          <label>
+            勤務日
+            <input name="date" type="date" defaultValue={today()} required />
+          </label>
+          <label>
+            スタッフ表示名
+            <input
+              name="label"
+              maxLength={50}
+              placeholder="例：スタッフA"
+              required
+            />
+          </label>
+          <label>
+            勤務開始
+            <input name="start" type="time" required />
+          </label>
+          <label>
+            勤務終了（翌日は25:00など）
+            <input
+              name="end"
+              placeholder="18:00"
+              required
+              pattern="[0-9]{1,2}:[0-9]{2}"
+            />
+          </label>
+          <label>
+            休憩（分）
+            <input
+              name="rest"
+              type="number"
+              min={0}
+              max={1439}
+              step={1}
+              defaultValue={0}
+              required
+            />
+          </label>
+          <button className="button primary" type="submit">
+            勤務予定を追加
+          </button>
+        </form>
+        {manualError && (
+          <p className="form-error" role="alert">
+            {manualError}
+          </p>
+        )}
+      </details>
       <details className="panel shift-import" open={!shifts.length}>
         <summary>
           勤務予定を読み込む <small>CSV / 一時表示</small>
@@ -195,7 +327,7 @@ export function Shifts({ scope }: { scope: StoreId | "all" }) {
           {sample
             ? "架空のサンプルです。実際の勤務予定ではありません。"
             : importedAt
-              ? `この画面への読込日時：${importedAt}（日本時間）。Airシフト上の最終更新日時ではありません。`
+              ? `この画面での更新日時：${importedAt}（日本時間）。Airシフト上の最終更新日時ではありません。`
               : "勤務予定は未取込です。人数・労働時間は未確定です。"}
         </p>
         <dl className="local-kpis">
@@ -230,6 +362,12 @@ export function Shifts({ scope }: { scope: StoreId | "all" }) {
             </dd>
           </div>
         </dl>
+        {shifts.length > 0 && (
+          <button className="button secondary" onClick={backup}>
+            <Download size={17} />
+            表示中の予定をCSV保存
+          </button>
+        )}
         <p className="small muted">
           記入済みの予定だけを集計します。予定のない日は「未登録」で、休業・欠員とは断定しません。予定時間は実労働時間や人時売上高へ自動加算しません。
         </p>

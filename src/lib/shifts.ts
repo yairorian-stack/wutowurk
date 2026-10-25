@@ -4,7 +4,7 @@ import { dateSchema } from "./domain";
 export const AIRSHIFT_URL = "https://airshift.jp/sft/monthlyshift";
 export const SHIFT_CSV_TEMPLATE =
   "\ufeff店舗,日付,表示名,開始,終了,休憩分\r\n本店,2026-10-25,スタッフA,10:00,15:00,30\r\n羽ノ浦店,2026-10-25,スタッフB,17:00,22:00,30\r\n";
-const shiftSchema = z
+export const shiftSchema = z
   .object({
     storeId: z.enum(["honten", "816"]),
     date: dateSchema,
@@ -110,6 +110,12 @@ export function parseShiftCsv(text: string): Shift[] {
       throw new Error(`${i + 2}行目：${parsed.error.issues[0].message}`);
     return parsed.data;
   });
+  return validateShifts(shifts);
+}
+export function validateShifts(input: unknown[]): Shift[] {
+  const parsed = z.array(shiftSchema).min(1).max(2000).safeParse(input);
+  if (!parsed.success) throw new Error(parsed.error.issues[0].message);
+  const shifts = parsed.data;
   // Compare absolute times, including overnight and cross-store double bookings.
   const byPerson = new Map<string, { start: number; end: number }[]>();
   for (const s of shifts) {

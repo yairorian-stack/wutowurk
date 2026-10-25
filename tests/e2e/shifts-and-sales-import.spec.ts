@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { IMPORTED_SALES_KEY } from "../../src/lib/imported-sales";
+import { parseShiftCsv } from "../../src/lib/shifts";
 
 const value = (sales: number | null, cumulative: number) => ({
   sales,
@@ -15,6 +16,80 @@ const sales = {
     { date: "2026-10-02", honten: value(null, 1000), "816": value(3000, 5000) },
   ],
 };
+test("紙のシフトを転記し、CSVを保存し、再読込して同じ勤務予定を表示できる", async ({
+  page,
+}) => {
+  await page.goto("/shifts");
+  await page.getByText("紙のシフトを入力する", { exact: false }).click();
+  const form = page.locator(".shift-manual");
+  await form.getByLabel("勤務日", { exact: true }).fill("2026-10-25");
+  await form.getByLabel("スタッフ表示名").fill("入力確認スタッフ");
+  await form.getByLabel("勤務開始").fill("10:00");
+  await form.getByLabel("勤務終了（翌日は25:00など）").fill("16:00");
+  await form.getByLabel("休憩（分）").fill("30");
+  await form
+    .getByRole("button", { name: "勤務予定を追加", exact: true })
+    .click();
+  await expect(page.locator(".shift-timeline")).toContainText(
+    "入力確認スタッフ",
+  );
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    page
+      .getByRole("button", { name: "表示中の予定をCSV保存", exact: true })
+      .click(),
+  ]);
+  const stream = await download.createReadStream(),
+    chunks: Buffer[] = [];
+  for await (const chunk of stream!) chunks.push(Buffer.from(chunk));
+  const csv = Buffer.concat(chunks).toString("utf8");
+  expect(parseShiftCsv(csv)[0]).toMatchObject({
+    label: "入力確認スタッフ",
+    start: 600,
+    end: 960,
+    breakMinutes: 30,
+  });
+  await page.reload();
+  await expect(page.locator(".shift-timeline")).toHaveCount(0);
+  await page
+    .getByLabel("シフトCSVを読み込む")
+    .setInputFiles({
+      name: "backup.csv",
+      mimeType: "text/csv",
+      buffer: Buffer.from(csv),
+    });
+  await expect(page.locator(".shift-timeline")).toContainText(
+    "入力確認スタッフ",
+  );
+});
+
+test("本店ゴミ出しボタンから照合用日程と前日通知時刻を確認でき、稼働中と誤認させない", async ({
+  page,
+}) => {
+  await page.goto("/daily");
+  await page.getByRole("link", { name: "本店ゴミ出し", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "本店のゴミ出し", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("自動通知は未稼働", { exact: true }),
+  ).toBeVisible();
+  await expect(page.locator(".garbage-events > li")).toHaveCount(6);
+  await expect(page.locator(".garbage-events")).toContainText("2026-11-05");
+  await expect(page.locator(".garbage-events")).toContainText("17:00 / 19:00");
+  await expect(
+    page.getByRole("link", { name: "阿南市の公式予定表を確認" }),
+  ).toHaveAttribute(
+    "href",
+    "https://www.city.anan.tokushima.jp/docs/2025071000030/",
+  );
+  await page.setViewportSize({ width: 320, height: 900 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+});
 test("売上ファイルを照合し、保存操作で端末内に保持し、出納帳サンプルへ加算しない", async ({
   page,
 }) => {

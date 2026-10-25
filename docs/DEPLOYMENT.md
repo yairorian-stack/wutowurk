@@ -18,6 +18,8 @@
 
 シフト画面は `https://yairorian-stack.github.io/wutowurk/#/shifts`。共通CSVの入力画面と明示的に開く架空サンプルのみを公開する。Airシフトからの自動取得は未接続。売上JSON読み込み画面も公開ビルドへ含むが、依頼者の実額JSON・実額入り確認版HTMLはリポジトリ外に保持し、承認なしに公開しない。
 
+本店ゴミ出し画面は `https://yairorian-stack.github.io/wutowurk/#/garbage`。11月の依頼者提供日程を「公式PDF未照合」「自動通知未稼働」と明示して公開する。メール宛先、LINE秘密値、Googleプロパティを公開HTMLへ含めない。GASコードの設置・OAuth・トリガーは別途Google側で実施するもので、Pagesへ公開しても自動通知は開始されない。
+
 ## GitHub側の設定（初回のみ・現在は設定済み）
 
 管理者が https://github.com/yairorian-stack/wutowurk/settings/pages を開き、次のように設定する。
