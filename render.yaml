@@ -1,0 +1,20 @@
+# Review in your own Render account. This file does not create a service or accept a contract.
+services:
+  - type: web
+    name: wuto-wurk-growth-portal
+    runtime: node
+    plan: free
+    region: singapore
+    branch: codex/growth-portal-finance
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start -- --port $PORT
+    healthCheckPath: /login
+    envVars:
+      - key: NODE_VERSION
+        value: 24.19.0
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_PUBLISHABLE_KEY
+        sync: false
+      - key: PORTAL_ORIGIN
+        sync: false

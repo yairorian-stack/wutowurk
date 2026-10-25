@@ -16,6 +16,8 @@ import {
   type StoreId,
 } from "@/lib/domain";
 import { updatePortal } from "@/lib/store";
+import { useMember } from "./member-context";
+import { MemberSettings } from "./member-settings";
 
 export function Settings({
   state,
@@ -24,6 +26,8 @@ export function Settings({
   state: PortalState;
   notify: (s: string) => void;
 }) {
+  const member = useMember();
+  if (member) return <MemberSettings member={member} />;
   function change(role: Role, storeId: StoreId) {
     try {
       updatePortal((s) => ({ ...s, session: { role, storeId } }));

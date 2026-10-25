@@ -23,7 +23,7 @@ if (parent === root || parent.startsWith(`${root}${path.sep}`))
 const data = reportedSalesSchema.parse(
   JSON.parse(await readFile(input, "utf8")),
 );
-const base = await readFile("out-pages/index.html", "utf8");
+const base = await readFile("out-review/index.html", "utf8");
 if (base.includes(`<script id="${REPORTED_SALES_ELEMENT_ID}"`))
   throw new Error("The base already contains a monthly snapshot.");
 const payload = JSON.stringify(data).replaceAll("<", "\\u003c");

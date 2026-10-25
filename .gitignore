@@ -9,3 +9,6 @@ test-results/
 .env*
 !.env.example
 next-env.d.ts
+
+out-review/
+test-results-auth/

@@ -2,6 +2,7 @@
 @import "./finance.css";
 @import "./self-evaluation.css";
 @import "./local-data.css";
+@import "./auth.css";
 
 @theme inline {
   --color-forest: #29473b;

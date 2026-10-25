@@ -53,6 +53,7 @@ import { Finance } from "./finance";
 import { SelfEvaluation } from "./self-evaluation";
 import { Shifts } from "./shifts";
 import { Garbage } from "./garbage";
+import { useMember } from "./member-context";
 import { Dialog } from "./dialog";
 import { GoalEditor } from "./goal-editor";
 import { Empty, StatusBadge } from "./ui";
@@ -130,7 +131,17 @@ export function Portal({ view }: { view: View }) {
   return <PortalContent view={view} />;
 }
 function PortalContent({ view }: { view: View }) {
-  const state = usePortal();
+  const storedState = usePortal();
+  const member = useMember();
+  const state = member
+    ? {
+        ...storedState,
+        session: {
+          role: member.role,
+          storeId: member.store_id ?? storedState.session.storeId,
+        },
+      }
+    : storedState;
   const [selectedScope, setSelectedScope] = useState<StoreId | "all" | null>(
     null,
   );
@@ -247,14 +258,18 @@ function PortalContent({ view }: { view: View }) {
             )}
           >
             <Settings2 size={18} />
-            試作品設定
+            {member ? "アカウント設定" : "試作品設定"}
             <ChevronRight size={14} />
           </Link>
           <div className="sidebar-profile">
-            <span className="avatar">見</span>
+            <span className="avatar">
+              {member?.display_name.slice(0, 1) ?? "見"}
+            </span>
             <div>
-              <strong>見学用アカウント</strong>
-              <small>{roles[state.session.role]}・デモ</small>
+              <strong>{member?.display_name ?? "見学用アカウント"}</strong>
+              <small>
+                {member?.job_title ?? `${roles[state.session.role]}・デモ`}
+              </small>
             </div>
             <Leaf size={16} />
           </div>
@@ -316,7 +331,7 @@ function PortalContent({ view }: { view: View }) {
         <main id="main-content" className="main-content">
           <div className="prototype-label">
             <span className="prototype-dot" />
-            体験版
+            {member ? "ログイン中" : "体験版"}
             <span className="prototype-label-text">
               {view === "self-evaluation"
                 ? "自己評価は送信・自動保存されません"
@@ -329,7 +344,9 @@ function PortalContent({ view }: { view: View }) {
                       : "架空のサンプルデータ / このブラウザー内に保存"}
             </span>
             <Link href="/settings">
-              {roles[state.session.role]}でプレビュー
+              {member
+                ? "アカウント設定"
+                : `${roles[state.session.role]}でプレビュー`}
               <EyeIcon />
             </Link>
           </div>

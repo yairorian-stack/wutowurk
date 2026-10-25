@@ -1,6 +1,7 @@
 "use client";
 import { useSyncExternalStore } from "react";
 import { createFinanceSeed, financeSchema, type FinanceState } from "./finance";
+import { scopedStorageKey } from "./browser-storage";
 
 export const FINANCE_KEY = "wuto-wurk-finance-demo-v1";
 const initial = createFinanceSeed();
@@ -8,11 +9,14 @@ let cache: FinanceState = initial,
   loaded = false,
   issue = "";
 const listeners = new Set<() => void>();
+let loadedKey = "";
 function read(force = false) {
+  const key = scopedStorageKey(FINANCE_KEY);
+  if (loadedKey !== key) { loadedKey = key; loaded = false; cache = initial; issue = ""; }
   if ((force || !loaded) && typeof window !== "undefined") {
     loaded = true;
     try {
-      const raw = localStorage.getItem(FINANCE_KEY);
+      const raw = localStorage.getItem(key);
       if (!raw) {
         cache = initial;
         issue = "";
@@ -32,7 +36,7 @@ function read(force = false) {
   return cache;
 }
 function changed(event: StorageEvent) {
-  if (event.key === FINANCE_KEY || event.key === null) {
+  if (event.key === scopedStorageKey(FINANCE_KEY) || event.key === null) {
     read(true);
     listeners.forEach((f) => f());
   }
@@ -59,7 +63,7 @@ export function updateFinance(fn: (state: FinanceState) => FinanceState) {
   if (!parsed.success)
     throw new Error("保存する日報・出納帳の形式を確認してください");
   try {
-    localStorage.setItem(FINANCE_KEY, JSON.stringify(next));
+    localStorage.setItem(scopedStorageKey(FINANCE_KEY), JSON.stringify(next));
   } catch {
     throw new Error(
       "保存できません。ブラウザーの空き容量・設定を確認してください",

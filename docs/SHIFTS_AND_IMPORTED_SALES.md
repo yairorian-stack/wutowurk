@@ -34,4 +34,4 @@ CSVはUTF-8、見出し `店舗,日付,表示名,開始,終了,休憩分`。店�
 
 ### 私的な確認用ファイル
 
-`npm run build:pages` の後、`node scripts/prepare-daily-sales-preview.mjs <private-json> <private-html>` で、実売上を含むHTMLをリポジトリ外にのみ生成できます。公開ビルドは実売上を含みません。取り込みは権限管理された共有DBへの登録ではありません。現在のサイトはログイン不要のため、実金額をPagesへ掲載する前に依頼者の明確な承認を得てください。
+`npm run build:pages` → `npm run build:review` の後、`node scripts/prepare-daily-sales-preview.mjs <private-json> <private-html>` で、内部確認用の実売上HTMLをリポジトリ外にのみ生成できます。公開ビルドはログイン準備画面だけで、実売上を含みません。取り込みは共有DBへの登録ではありません。個人用の確認HTMLは公開しません。Pagesでは安全な認証を実行できないため、実金額の一般公開は行いません。

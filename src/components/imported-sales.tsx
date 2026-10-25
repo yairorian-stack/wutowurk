@@ -12,6 +12,7 @@ import {
 import { stores } from "@/lib/domain";
 import { yen } from "@/lib/finance";
 import { downloadText } from "@/lib/download";
+import { scopedStorageKey } from "@/lib/browser-storage";
 
 export function ImportedSalesPanel({
   scope,
@@ -46,7 +47,7 @@ export function ImportedSalesPanel({
   }
   function save() {
     try {
-      localStorage.setItem(IMPORTED_SALES_KEY, JSON.stringify(data));
+      localStorage.setItem(scopedStorageKey(IMPORTED_SALES_KEY), JSON.stringify(data));
       setMessage(
         "このブラウザーに保存しました。他の端末やスタッフには共有されません。バックアップも保存してください。",
       );

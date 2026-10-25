@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { scopedStorageKey } from "./browser-storage";
 
 export const IMPORTED_SALES_KEY = "wuto-wurk-imported-sales-v1";
 export const IMPORTED_SALES_ELEMENT_ID = "wuto-wurk-imported-sales";
@@ -67,7 +68,7 @@ export function readInitialSales(): {
   try {
     const raw =
       document.getElementById(IMPORTED_SALES_ELEMENT_ID)?.textContent ||
-      localStorage.getItem(IMPORTED_SALES_KEY);
+      localStorage.getItem(scopedStorageKey(IMPORTED_SALES_KEY));
     return { data: raw ? parseImportedSales(raw) : null, error: "" };
   } catch (e) {
     return {
