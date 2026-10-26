@@ -1,0 +1,37 @@
+import "server-only";
+import { createClient } from "@supabase/supabase-js";
+import { authConfig } from "./auth-config";
+import { OtpGuard, parseOtpAllowlist } from "./otp-security";
+
+export const otpCookie = "wuto-email-attempt";
+const runtime = globalThis as typeof globalThis & { __wutoEmailOtpGuard?: OtpGuard };
+export const otpGuard = runtime.__wutoEmailOtpGuard ??= new OtpGuard();
+export const otpAllowlist = () => parseOtpAllowlist(process.env.PORTAL_OTP_ALLOWED_EMAILS);
+function mailClient() {
+  const config = authConfig();
+  return config ? createClient(config.url, config.key, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, flowType: "implicit" },
+    global: { fetch: (input, init) => fetch(input, { ...init, signal: AbortSignal.timeout(15_000), cache: "no-store" }) },
+  }) : null;
+}
+export async function emailOtpReady() {
+  if (!otpAllowlist().size) return false;
+  try {
+    const client = mailClient();
+    if (!client) return false;
+    const { data, error } = await client.rpc("portal_email_otp_ready");
+    return !error && data === true;
+  } catch { return false; }
+}
+export async function sendEmailOtp(email: string) {
+  try {
+    // Recheck server configuration before the scheduled side effect.
+    if (!otpAllowlist().has(email) || !await emailOtpReady()) return;
+    const client = mailClient()!;
+    const { error } = await client.auth.signInWithOtp({ email, options: { shouldCreateUser: false } });
+    if (error) console.warn("Email OTP delivery not confirmed; backup Google login remains available.");
+  } catch {
+    // No recipient, code, provider response body, token, or SMTP secret in logs.
+    console.warn("Email OTP delivery not confirmed; backup Google login remains available.");
+  }
+}

@@ -17,12 +17,15 @@ import { scopedStorageKey } from "@/lib/browser-storage";
 export function ImportedSalesPanel({
   scope,
   onAvailable,
+  sharedData,
 }: {
   scope: SalesScope;
   onAvailable: (value: boolean) => void;
+  sharedData?: ImportedSales;
 }) {
-  const [initial] = useState(readInitialSales);
-  const [data, setData] = useState(initial.data);
+  const [initial] = useState(() => sharedData ? { data: sharedData, error: "" } : readInitialSales());
+  const [localData, setData] = useState(initial.data);
+  const data = sharedData ?? localData;
   const [message, setMessage] = useState("");
   const [error, setError] = useState(initial.error);
   const [month, setMonth] = useState(initial.data?.asOf.slice(0, 7) ?? "");
@@ -74,11 +77,11 @@ export function ImportedSalesPanel({
       <div className="section-heading">
         <div>
           <p className="eyebrow">REPORTED SALES</p>
-          <h2 id="imported-sales-title">提供データの売上記録</h2>
+          <h2 id="imported-sales-title">{sharedData ? "実績売上の集計" : "提供データの売上記録"}</h2>
         </div>
         <Upload size={22} />
       </div>
-      <p>
+      {sharedData ? <p>提供された実績を反映済みです。集計基準日までの売上を、店舗を切り替えて確認できます。</p> : <><p>
         実売上はサンプルと分けて記録します。ファイルの内容はサーバーへ送信せず、この端末で読み込みます。
       </p>
       <p className="small muted">
@@ -94,7 +97,7 @@ export function ImportedSalesPanel({
             e.target.value = "";
           }}
         />
-      </label>
+      </label></>}
       {error && (
         <p role="alert" className="form-error">
           {error}
@@ -116,7 +119,7 @@ export function ImportedSalesPanel({
                 ))}
               </select>
             </label>
-            <button className="button primary" onClick={save}>
+            {!sharedData && <><button className="button primary" onClick={save}>
               <Save size={17} />
               この端末に保存
             </button>
@@ -131,7 +134,7 @@ export function ImportedSalesPanel({
             >
               <Download size={17} />
               バックアップ
-            </button>
+            </button></>}
           </div>
           <p className="small muted">
             出典：{data.source} ／ 集計基準日：{data.asOf} ／ 表示：
@@ -214,9 +217,9 @@ export function ImportedSalesPanel({
               </tbody>
             </table>
           </div>
-          <p className="small muted">
+          {!sharedData && <p className="small muted">
             ブラウザーのデータ削除・端末変更で記録を失う場合があります。バックアップを保管してください。共有・権限制御には非公開の保存先が必要です。
-          </p>
+          </p>}
         </>
       )}
     </section>

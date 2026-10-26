@@ -72,7 +72,7 @@ export function Finance(props: Props) {
       <section className="panel finance-restricted">
         <LockKeyhole size={34} />
         <h1>売上・日報・現金出納帳</h1>
-        <p>店舗管理者以上のプレビューで利用できます。</p>
+        <p>このページは店舗管理者以上が利用できます。</p>
         <p className="small muted">
           店舗管理者は所属店、全社・システム管理者は全店を確認する設計です。
         </p>

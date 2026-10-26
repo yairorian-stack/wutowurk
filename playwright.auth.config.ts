@@ -41,6 +41,7 @@ export default defineConfig({
         SUPABASE_URL: "http://127.0.0.1:3101",
         SUPABASE_PUBLISHABLE_KEY: "sb_publishable_fixture_only",
         PORTAL_ORIGIN: "http://127.0.0.1:3100",
+        PORTAL_OTP_ALLOWED_EMAILS: ["owner-otp-desktop", "owner-otp-mobile", "owner-wrong-desktop", "owner-wrong-mobile", "expired-desktop", "expired-mobile", "deliveryfail-desktop", "deliveryfail-mobile"].map((s) => s + "@example.invalid").join(","),
       },
     },
   ],

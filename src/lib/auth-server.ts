@@ -6,11 +6,12 @@ import { createServerClient } from "@supabase/ssr";
 import { authConfig } from "./auth-config";
 import { memberSchema, type Member } from "./membership";
 
-export async function authClient() {
+export async function authClient(timeoutMs?: number) {
   const config = authConfig();
   if (!config) return null;
   const jar = await cookies();
   return createServerClient(config.url, config.key, {
+    ...(timeoutMs ? { global: { fetch: (input: RequestInfo | URL, init?: RequestInit) => fetch(input, { ...init, signal: AbortSignal.timeout(timeoutMs), cache: "no-store" }) } } : {}),
     cookieOptions: {
       httpOnly: true,
       secure: config.secure,
@@ -56,7 +57,13 @@ export const getAccess = cache(async (): Promise<Access> => {
     } = await supabase.auth.getUser();
     if (error || !user || !user.email_confirmed_at)
       return { state: "anonymous", member: null };
-    const { data: allowed, error: allowError } = await supabase.rpc("portal_google_allowed");
+    let { data: allowed, error: allowError } = await supabase.rpc("portal_access_allowed");
+    // Additive deployment: retain working Google login until the OTP migration is applied.
+    // Only a missing-function response falls back, never a denial/connection failure.
+    if (allowError?.code === "PGRST202") {
+      const legacy = await supabase.rpc("portal_google_allowed");
+      allowed = legacy.data; allowError = legacy.error;
+    }
     if (allowError) return { state: "unavailable", member: null };
     if (allowed !== true) return { state: "disabled", member: null };
     const { data, error: profileError } = await supabase

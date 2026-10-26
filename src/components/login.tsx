@@ -1,114 +1,58 @@
 "use client";
 import { useState, type FormEvent } from "react";
-import { ArrowRight, Leaf, LockKeyhole } from "lucide-react";
-export function Login({ configured, failed = false }: { configured: boolean; failed?: boolean }) {
-  const [name, setName] = useState(""),
-    [email, setEmail] = useState("");
-  const [busy, setBusy] = useState(false),
-    [error, setError] = useState(failed ? "ログインできませんでした。登録済みの氏名・Googleアカウントをご確認ください。" : "");
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!configured || busy) return;
-    setBusy(true);
-    setError("");
+import { ArrowRight, Leaf, LockKeyhole, Mail } from "lucide-react";
+export function Login({ configured, otpAvailable = false, failed = false }: { configured: boolean; otpAvailable?: boolean; failed?: boolean }) {
+  const [name, setName] = useState(""), [email, setEmail] = useState(""), [code, setCode] = useState("");
+  const [stage, setStage] = useState<"email" | "code">("email"), [busy, setBusy] = useState(false);
+  const [error, setError] = useState(failed ? "ログインできませんでした。登録済みの氏名・Googleアカウントをご確認ください。" : "");
+  async function perform(kind: "request" | "verify" | "google") {
+    if (!configured || busy || (kind !== "google" && !otpAvailable)) return;
+    setBusy(true); setError("");
     try {
-      const response = await fetch(
-        "/api/auth/google",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "same-origin",
-          cache: "no-store",
-          body: JSON.stringify({
-            displayName: name,
-            email,
-          }),
-        },
-      );
+      const response = await fetch(`/api/auth/${kind}`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, credentials: "same-origin", cache: "no-store",
+        body: JSON.stringify({ email, ...(kind === "verify" ? { code } : {}), ...(kind === "google" ? { displayName: name } : {}) }),
+      });
       const result = await response.json();
-      if (!response.ok)
-        throw new Error(
-          result.message ??
-            "認証できませんでした。時間をおいてお試しください。",
-        );
-      if (typeof result.url !== "string") throw new Error("Googleログインを開始できませんでした。");
-      window.location.assign(result.url);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "接続できませんでした。");
-    } finally {
-      setBusy(false);
-    }
+      if (!response.ok) throw new Error(result.message ?? "ログインできませんでした。時間をおいてお試しください。");
+      if (kind === "request") { setStage("code"); setCode(""); }
+      else if (kind === "verify") window.location.replace("/");
+      else {
+        if (typeof result.url !== "string") throw new Error("Googleログインを開始できませんでした。");
+        window.location.assign(result.url);
+      }
+    } catch (e) { setError(e instanceof Error ? e.message : "接続できませんでした。"); }
+    finally { setBusy(false); }
   }
+  function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); void perform(stage === "email" ? "request" : "verify"); }
   return (
     <main className="auth-page">
-      <div className="auth-brand">
-        <Leaf size={28} />
-        <strong>WUTO-WURK</strong>
-        <span>GROWTH PORTAL</span>
-      </div>
+      <div className="auth-brand"><Leaf size={28} /><strong>WUTO-WURK</strong><span>GROWTH PORTAL</span></div>
       <section className="auth-card" aria-labelledby="login-title">
-        <span className="auth-icon">
-          <LockKeyhole size={28} />
-        </span>
-        <p className="eyebrow">GROW TOGETHER.</p>
-        <h1 id="login-title">スタッフログイン</h1>
-        <p className="auth-lead">
-          一皿から、その土地を好きになる。
-          <br />
-          チームの成長を、ここから。
-        </p>
-        {!configured && (
-          <div className="auth-notice" role="status">
-            <strong>ログインの設定準備中です</strong>
-            <p>
-              認証サービスの接続後に利用できます。現在、Googleログインと社内画面へのログインはできません。
-            </p>
-          </div>
-        )}
+        <span className="auth-icon"><LockKeyhole size={28} /></span>
+        <p className="eyebrow">GROW TOGETHER.</p><h1 id="login-title">スタッフログイン</h1>
+        <p className="auth-lead">登録済みのメールアドレスに届く<br />6桁の確認コードでログインします。</p>
+        {!configured ? <div className="auth-notice" role="status"><strong>ログインの設定準備中です</strong><p>認証サービスの接続後に利用できます。現在、社内画面へのログインはできません。</p></div>
+          : !otpAvailable && <div className="auth-notice" role="status"><strong>確認コード方式は準備中です</strong><p>現在は下のGoogleログインをご利用ください。</p></div>}
         <form onSubmit={submit}>
-          <label>
-            氏名<span>必須</span>
-            <input
-              name="name"
-              autoComplete="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-              maxLength={80}
-              placeholder="登録する氏名"
-            />
-          </label>
-          <label>
-            メールアドレス<span>必須</span>
-            <input
-              name="email"
-              type="email"
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              maxLength={254}
-              placeholder="name@example.com"
-            />
-          </label>
-          {error && (
-            <p className="form-error" role="alert">
-              {error}
-            </p>
-          )}
-          <button
-            type="submit"
-            className="button primary"
-            disabled={!configured || busy}
-          >
-            {busy ? "Googleへ移動中…" : <><ArrowRight size={18} />Googleでログイン</>}
+          <label>メールアドレス<span>必須</span><input name="email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required maxLength={254} readOnly={stage === "code"} placeholder="登録済みのメールアドレス" /></label>
+          {stage === "code" && <>
+            <p className="auth-code-note" role="status">登録済みのアドレスの場合、確認コードを送信します。届かない場合は迷惑メールも確認してください。</p>
+            <label>確認コード<input name="code" value={code} onChange={(e) => setCode(e.target.value)} autoComplete="one-time-code" inputMode="numeric" pattern="[0-9]{6}" required minLength={6} maxLength={6} /></label>
+          </>}
+          {error && <p className="form-error" role="alert">{error}</p>}
+          <button type="submit" className="button primary" disabled={!configured || !otpAvailable || busy}>
+            {busy ? "確認中…" : stage === "email" ? <><Mail size={18} />確認コードを送信</> : <>確認コードでログイン<ArrowRight size={18} /></>}
           </button>
+          {stage === "code" && <button type="button" className="text-button" disabled={busy} onClick={() => { setStage("email"); setCode(""); setError(""); }}>メールアドレスを入力し直す・再送する</button>}
+          <details open={!otpAvailable} className="auth-backup"><summary>予備のGoogleログイン</summary>
+            <p className="auth-code-note">確認コードが届かない場合は、登録済みのGoogleアカウントを使えます。</p>
+            <label>氏名（Googleログイン用）<input name="name" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} maxLength={80} placeholder="登録済みの氏名" /></label>
+            <button type="button" className="button secondary" disabled={!configured || busy} onClick={() => void perform("google")}>Googleでログイン</button>
+          </details>
         </form>
-        <p className="auth-footnote">
-          事前登録されたGoogleアカウントのみ利用できます。登録済みの氏名・メールアドレスを入力し、同じGoogleアカウントを選んでください。
-        </p>
-      </section>
-      <p className="auth-motto">人が育ち、店舗が育ち、地域が育つ。</p>
+        <p className="auth-footnote">事前登録済みの方のみ利用できます。確認コードは他の人に共有しないでください。コードの有効時間は10分です。再送は1分以上あけてください。</p>
+      </section><p className="auth-motto">人が育ち、店舗が育ち、地域が育つ。</p>
     </main>
   );
 }

@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 async function login(page: Page, email: string) {
   await page.goto("/login");
+  await page.getByText("予備のGoogleログイン", { exact: true }).click();
   await page.getByLabel("氏名", { exact: false }).fill("テストスタッフ");
   await page.getByLabel("メールアドレス", { exact: false }).fill(email);
   await page.getByRole("button", { name: "Googleでログイン", exact: true }).click();
@@ -42,7 +43,7 @@ test("未ログイン・ローカル保存の偽権限では全ページとメ�
   expect(response.status()).toBe(401);
   expect(await response.text()).not.toContain("example.invalid");
 });
-test("氏名・メールを必須にし、別サイトからの開始と旧メール経路を拒否する", async ({ request }) => {
+test("Googleの氏名・メールを必須にし、別サイトからの開始を拒否する", async ({ request }) => {
   const empty = await request.post("/api/auth/google", {
     headers: { Origin: "http://127.0.0.1:3100" }, data: { displayName: "", email: "staff@example.invalid" },
   });
@@ -51,9 +52,7 @@ test("氏名・メールを必須にし、別サイトからの開始と旧メ�
     headers: { Origin: "https://evil.example" }, data: { displayName: "テストスタッフ", email: "staff@example.invalid" },
   });
   expect(foreign.status()).toBe(403);
-  for (const endpoint of ["request", "verify"]) {
-    expect((await request.post(`/api/auth/${endpoint}`, { data: {} })).status()).toBe(410);
-  }
+
 });
 test("未登録・別のGoogleアカウント・Google以外の認証・停止済みはログインできない", async ({ page }) => {
   for (const prefix of ["unlisted", "mismatch", "emailonly", "disabled", "cancel"]) {
@@ -132,6 +131,7 @@ test("全社管理者には承認画面を表示し、名前違いのログイ�
     page.getByRole("heading", { name: "スタッフの登録・承認", exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: "ログアウト", exact: true }).click();
+  await page.getByText("予備のGoogleログイン", { exact: true }).click();
   await page.getByLabel("氏名", { exact: false }).fill("別の氏名");
   await page
     .getByLabel("メールアドレス", { exact: false })
@@ -170,4 +170,58 @@ test("公開用Pagesは全ハッシュで閉じ、既存業務のコード・実
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
+});
+
+test("メールと6桁コードでログインでき、コードの再利用では入れない", async ({ page, context }, info) => {
+  await context.setExtraHTTPHeaders({ "x-forwarded-for": `ui-${info.project.name}` });
+  const email = `owner-otp-${info.project.name}@example.invalid`;
+  await page.goto("/login");
+  await page.getByLabel("メールアドレス", { exact: false }).fill(email);
+  await page.getByRole("button", { name: "確認コードを送信", exact: true }).click();
+  await expect.poll(async () => (await (await page.request.get(`http://127.0.0.1:3101/fixture/otp-count?email=${email}`)).json()).count).toBe(1);
+  await page.getByLabel("確認コード", { exact: true }).fill("123456");
+  await page.getByRole("button", { name: "確認コードでログイン", exact: true }).click();
+  await expect(page).toHaveURL("http://127.0.0.1:3100/");
+  const res = await page.request.post("/api/auth/verify", { headers: { Origin: "http://127.0.0.1:3100" }, data: { email, code: "123456" } });
+  expect(res.status()).toBe(401);
+  const cookies = await context.cookies();
+  expect(cookies.some(c => c.name.includes("auth-token") && c.httpOnly)).toBe(true);
+});
+test("未登録への送信を行わず、応答とCookieの形から登録状況を公開しない", async ({ page }, info) => {
+  const email = `unlisted-otp-${info.project.name}@example.invalid`;
+  const response = await page.request.post("/api/auth/request", { headers: { Origin: "http://127.0.0.1:3100" }, data: { email } });
+  expect(response.status()).toBe(200); expect(await response.json()).toEqual({ accepted: true, message: "登録済みのアドレスの場合、確認コードを送信します。" });
+  const count = await page.request.get(`http://127.0.0.1:3101/fixture/otp-count?email=${email}`);
+  expect((await count.json()).count).toBe(0);
+  const denied = await page.request.post("/api/auth/verify", { headers: { Origin: "http://127.0.0.1:3100" }, data: { email, code: "123456" } });
+  expect(denied.status()).toBe(401);
+  await page.goto("/daily"); await expect(page).toHaveURL(/\/login$/);
+});
+test("コード誤りと試行上限を拒否し、メール失敗時もGoogleを予備として残す", async ({ page, context }, info) => {
+  await context.setExtraHTTPHeaders({ "x-forwarded-for": `wrong-${info.project.name}` });
+  const email = `owner-wrong-${info.project.name}@example.invalid`;
+  const headers = { Origin: "http://127.0.0.1:3100" };
+  await page.request.post("/api/auth/request", { headers, data: { email } });
+  await expect.poll(async () => (await (await page.request.get(`http://127.0.0.1:3101/fixture/otp-count?email=${email}`)).json()).count).toBe(1);
+  for (let i = 0; i < 5; i++) expect((await page.request.post("/api/auth/verify", { headers, data: { email, code: "999999" } })).status()).toBe(401);
+  expect((await page.request.post("/api/auth/verify", { headers, data: { email, code: "123456" } })).status()).toBe(401);
+  await page.goto("/daily"); await expect(page).toHaveURL(/\/login$/);
+  const failure = `deliveryfail-${info.project.name}@example.invalid`;
+  expect((await page.request.post("/api/auth/request", { headers, data: { email: failure } })).status()).toBe(200);
+  await login(page, `legacy-${info.project.name}@example.invalid`);
+  await expect(page).toHaveURL("http://127.0.0.1:3100/");
+});
+
+test("許可ユーザーの実績確認画面は共有売上を表示し、未認証の応答へ含めない", async ({ page }) => {
+  const anon = await page.request.get("/daily"); expect(await anon.text()).not.toContain("架空の共有実績テスト");
+  await login(page, "owner-sales@example.invalid"); await expect(page).toHaveURL("http://127.0.0.1:3100/");
+  await page.goto("/daily");
+  await expect(page.getByRole("heading", { name: "実績売上の集計" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "現金出納帳", exact: true })).toBeVisible();
+  await expect(page.getByText("明細未提供・残高未照合", { exact: true })).toBeVisible();
+  await page.getByLabel("表示する店舗", { exact: true }).selectOption("all");
+  await expect(page.getByTestId("imported-sales-total")).toContainText("2,500");
+  await expect(page.getByText("元の集計結果は、まだポータルへ反映されていません。", { exact: true })).toHaveCount(0);
+  await expect(page.getByLabel("売上ファイルを読み込む（JSON）")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "サンプルで操作を試す" })).toHaveCount(0);
 });

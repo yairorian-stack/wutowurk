@@ -2,7 +2,7 @@
 import http from "node:http";
 import { createHash, randomUUID } from "node:crypto";
 const sessions = new Map(),
-  profiles = new Map(), codes = new Map();
+  profiles = new Map(), codes = new Map(), otpDeliveries = new Map(), otpCodes = new Map(), sessionMethods = new Map();
 function member(email) {
   const hash = createHash("sha256").update(email).digest("hex");
   const id = `${hash.slice(0, 8)}-${hash.slice(8, 12)}-4${hash.slice(13, 16)}-8${hash.slice(17, 20)}-${hash.slice(20, 32)}`;
@@ -51,6 +51,15 @@ function user(profile) {
     created_at: "2026-10-25T00:00:00Z",
   };
 }
+function session(p, method) {
+  const now = Math.floor(Date.now() / 1000);
+  const payload = { sub: p.user_id, email: p.email, role: "authenticated", aud: "authenticated", iat: now, exp: now + 3600,
+    session_id: randomUUID(), app_metadata: user(p).app_metadata, amr: [{ method, timestamp: now }] };
+  const jwt = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString("base64url") + "." +
+    Buffer.from(JSON.stringify(payload)).toString("base64url") + "." + Buffer.from(randomUUID()).toString("base64url");
+  sessions.set(jwt, p); sessionMethods.set(jwt, method);
+  return { access_token: jwt, refresh_token: randomUUID(), token_type: "bearer", expires_in: 3600, expires_at: now + 3600, user: user(p) };
+}
 function reply(response, status, data) {
   response.writeHead(status, {
     "Content-Type": "application/json",
@@ -92,15 +101,23 @@ http
       const challenge = createHash("sha256").update(body.code_verifier ?? "").digest("base64url");
       if (!grant || grant.challenge !== challenge || !grant.email?.endsWith("@example.invalid"))
         return reply(response, 400, { code: "invalid_grant", msg: "invalid code" });
-      const p = member(grant.email), now = Math.floor(Date.now() / 1000);
-      const payload = { sub: p.user_id, email: p.email, role: "authenticated", aud: "authenticated",
-        iat: now, exp: now + 3600, session_id: randomUUID(), app_metadata: user(p).app_metadata,
-        amr: [{ method: p.email.startsWith("emailonly") ? "otp" : "oauth", timestamp: now }] };
-      const jwt = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString("base64url") + "." +
-        Buffer.from(JSON.stringify(payload)).toString("base64url") + "." + Buffer.from(randomUUID()).toString("base64url");
-      sessions.set(jwt, p);
-      return reply(response, 200, { access_token: jwt, refresh_token: randomUUID(), token_type: "bearer",
-        expires_in: 3600, expires_at: now + 3600, user: user(p) });
+      const p = member(grant.email);
+      return reply(response, 200, session(p, p.email.startsWith("emailonly") ? "otp" : "oauth"));
+    }
+    if (url.pathname === "/fixture/otp-count") return reply(response, 200, { count: otpDeliveries.get(url.searchParams.get("email")) ?? 0 });
+    if (url.pathname === "/rest/v1/rpc/portal_email_otp_ready") return reply(response, 200, true);
+    if (url.pathname === "/auth/v1/otp") {
+      if (body.create_user !== false) return reply(response, 400, { msg: "unexpected signup" });
+      otpDeliveries.set(body.email, (otpDeliveries.get(body.email) ?? 0) + 1);
+      if (body.email?.startsWith("deliveryfail")) return reply(response, 500, { msg: "email delivery failed" });
+      otpCodes.set(body.email, "123456");
+      return reply(response, 200, {});
+    }
+    if (url.pathname === "/auth/v1/verify") {
+      if (body.type !== "email" || otpCodes.get(body.email) !== body.token || body.email?.startsWith("expired"))
+        return reply(response, 401, { code: "otp_expired", msg: "invalid code" });
+      otpCodes.delete(body.email);
+      return reply(response, 200, session(member(body.email), "otp"));
     }
     if (!profile)
       return reply(response, 401, { code: "bad_jwt", msg: "invalid token" });
@@ -112,6 +129,14 @@ http
       return response.end();
     }
     const allowed = !["unlisted", "emailonly", "revoked"].some((prefix) => profile.email.startsWith(prefix));
+    if (url.pathname === "/rest/v1/rpc/portal_access_allowed") {
+      if (profile.email.startsWith("legacy")) return reply(response, 404, { code: "PGRST202", message: "function not found" });
+      return reply(response, 200, allowed);
+    }
+    if (url.pathname === "/rest/v1/rpc/portal_accept_email_invitation") {
+      if (!allowed || sessionMethods.get(token) !== "otp" || profile.status !== "approved") return reply(response, 403, { message: "denied" });
+      return reply(response, 200, profile);
+    }
     if (url.pathname === "/rest/v1/rpc/portal_google_allowed") return reply(response, 200, allowed);
     if (url.pathname === "/rest/v1/rpc/portal_accept_google_invitation") {
       if (!allowed || profile.status === "disabled" || body.p_display_name !== "テストスタッフ")
@@ -121,6 +146,17 @@ http
     const admin =
       profile.status === "approved" &&
       ["company", "system"].includes(profile.role);
+    if (url.pathname === "/rest/v1/portal_sales_imports") return reply(response, 200,
+      admin || profile.role === "manager" ? { id: "fixture", source: "架空の共有実績テスト", as_of: "2026-10-02" } : null);
+    if (url.pathname === "/rest/v1/portal_sales_daily") {
+      const rows = [
+        { store_id: "honten", sales_date: "2026-10-01", sales_jpy: 1500, cumulative_jpy: 1500, reported_yoy: 110 },
+        { store_id: "honten", sales_date: "2026-10-02", sales_jpy: null, cumulative_jpy: 1500, reported_yoy: 90 },
+        { store_id: "816", sales_date: "2026-10-01", sales_jpy: 600, cumulative_jpy: 600, reported_yoy: 100 },
+        { store_id: "816", sales_date: "2026-10-02", sales_jpy: 400, cumulative_jpy: 1000, reported_yoy: 120 },
+      ];
+      return reply(response, 200, rows.filter(r => admin || (profile.role === "manager" && r.store_id === profile.store_id)));
+    }
     if (url.pathname === "/rest/v1/portal_members") {
       let rows = [...profiles.values()].filter(
         (p) => admin || p.user_id === profile.user_id,

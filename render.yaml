@@ -17,3 +17,5 @@ services:
       - key: SUPABASE_PUBLISHABLE_KEY
         sync: false
     # Render supplies RENDER_EXTERNAL_URL; PORTAL_ORIGIN can override it for a custom domain.
+    # Optional: add PORTAL_OTP_ALLOWED_EMAILS privately in Render Environment after OTP DB setup.
+    # Keep Google enabled until real OTP delivery and login have both been verified.

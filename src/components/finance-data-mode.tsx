@@ -6,6 +6,7 @@ import { yen } from "@/lib/finance";
 import { readReportedSales } from "@/lib/reported-sales";
 import { ImportedSalesPanel } from "./imported-sales";
 import { readInitialSales } from "@/lib/imported-sales";
+import { useSharedSales } from "./shared-sales-context";
 
 const SAMPLE_SESSION_KEY = "wuto-wurk-finance-sample-session-v1";
 function sampleIsOpen() {
@@ -24,6 +25,7 @@ export function FinanceDataMode({
   scope: StoreId | "all";
   children: React.ReactNode;
 }) {
+  const shared = useSharedSales();
   const [reported] = useState(readReportedSales);
   const [hasImported, setHasImported] = useState(
     () => readInitialSales().data !== null,
@@ -40,6 +42,18 @@ export function FinanceDataMode({
     }
     setSample(open);
   }
+  if (shared) return <>
+    <div className="page-intro finance-intro"><div><p className="eyebrow">SALES / DAILY REPORT / CASHBOOK</p><h1>売上・日報・現金出納帳</h1><p className="muted">提供された実績の確認</p></div></div>
+    {shared.status === "ready" ? <ImportedSalesPanel scope={scope} onAvailable={setHasImported} sharedData={shared.data} /> :
+      <section className="panel"><h2>{shared.status === "pending" ? "実績データの反映準備中です" : "実績データを読み込めませんでした"}</h2><p>管理者へお問い合わせいただくか、時間をおいて再読み込みしてください。売上0円を示すものではありません。</p></section>}
+    <section className="panel" aria-labelledby="cashbook-status-title">
+      <p className="eyebrow">CASHBOOK</p><h2 id="cashbook-status-title">現金出納帳</h2>
+      <p>出納帳の元データが未提供のため、入出金明細と現金残高はまだ表示できません。売上合計を現金売上とみなして残高に加算していません。</p>
+      <dl className="local-kpis"><div><dt>開始残高・前月繰越</dt><dd>未提供</dd></div><div><dt>現金売上とキャッシュレスの内訳</dt><dd>未提供</dd></div><div><dt>仕入・支払・預入・その他入出金</dt><dd>未提供</dd></div></dl>
+      <div className="local-table-scroll"><table className="local-table"><caption>現金出納帳の記録状況</caption><thead><tr><th scope="col">日付</th><th scope="col">内容</th><th scope="col">入金</th><th scope="col">出金</th><th scope="col">現金残高</th></tr></thead><tbody><tr><td colSpan={5}>明細未提供・残高未照合</td></tr></tbody></table></div>
+      <p className="small muted">元の現金出納帳または日別の現金内訳・入出金明細をご提供いただいた後、照合して反映します。</p>
+    </section>
+  </>;
   if (sample)
     return (
       <>

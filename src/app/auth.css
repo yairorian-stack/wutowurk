@@ -215,3 +215,6 @@
     width: 100%;
   }
 }
+
+.auth-backup { margin-top: 24px; border-top: 1px solid #e0e6d6; padding-top: 18px; }
+.auth-backup summary { cursor: pointer; color: #426048; font-size: 14px; }
