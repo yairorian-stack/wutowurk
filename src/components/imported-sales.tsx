@@ -6,6 +6,7 @@ import {
   parseImportedSales,
   readInitialSales,
   salesMonthSummary,
+  salesDateLabel,
   type ImportedSales,
   type SalesScope,
 } from "@/lib/imported-sales";
@@ -206,7 +207,7 @@ export function ImportedSalesPanel({
               <tbody>
                 {summary.rows.map((r) => (
                   <tr key={r.date}>
-                    <th scope="row">{r.date.slice(5).replace("-", "/")}</th>
+                    <th scope="row"><time dateTime={r.date}>{salesDateLabel(r.date)}</time></th>
                     {stores
                       .filter((s) => scope === "all" || s.id === scope)
                       .map((s) => (

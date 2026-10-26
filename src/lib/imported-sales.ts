@@ -60,6 +60,14 @@ export const importedSalesSchema = z
 export type ImportedSales = z.infer<typeof importedSalesSchema>;
 export type SalesScope = "honten" | "816" | "all";
 
+const salesWeekday = new Intl.DateTimeFormat("ja-JP", {
+  weekday: "short",
+  timeZone: "Asia/Tokyo",
+});
+export function salesDateLabel(value: string) {
+  return `${value.slice(5).replace("-", "/")}（${salesWeekday.format(new Date(`${value}T00:00:00Z`))}）`;
+}
+
 export function readInitialSales(): {
   data: ImportedSales | null;
   error: string;

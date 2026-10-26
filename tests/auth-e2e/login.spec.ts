@@ -212,7 +212,7 @@ test("コード誤りと試行上限を拒否し、メール失敗時もGoogle�
   await expect(page).toHaveURL("http://127.0.0.1:3100/");
 });
 
-test("許可ユーザーの実績確認画面は共有売上を表示し、未認証の応答へ含めない", async ({ page }) => {
+test("許可ユーザーの実績確認画面は共有売上を表示し、未認証の応答へ含めない", async ({ page }, info) => {
   const anon = await page.request.get("/daily"); expect(await anon.text()).not.toContain("架空の共有実績テスト");
   await login(page, "owner-sales@example.invalid"); await expect(page).toHaveURL("http://127.0.0.1:3100/");
   await page.goto("/daily");
@@ -221,6 +221,14 @@ test("許可ユーザーの実績確認画面は共有売上を表示し、未�
   await expect(page.getByText("明細未提供・残高未照合", { exact: true })).toBeVisible();
   await page.getByLabel("表示する店舗", { exact: true }).selectOption("all");
   await expect(page.getByTestId("imported-sales-total")).toContainText("2,500");
+  await expect(page.getByRole("rowheader", { name: "10/01（木）", exact: true })).toBeVisible();
+  await expect(page.getByRole("rowheader", { name: "10/02（金）", exact: true })).toBeVisible();
+  await expect(page.locator('time[datetime="2026-10-01"]')).toHaveText("10/01（木）");
+  if (info.project.name === "mobile") {
+    await page.setViewportSize({ width: 320, height: 900 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await expect(page.getByRole("rowheader", { name: "10/01（木）", exact: true })).toBeVisible();
+  }
   await expect(page.getByText("元の集計結果は、まだポータルへ反映されていません。", { exact: true })).toHaveCount(0);
   await expect(page.getByLabel("売上ファイルを読み込む（JSON）")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "サンプルで操作を試す" })).toHaveCount(0);

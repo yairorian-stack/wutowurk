@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   parseImportedSales,
   salesMonthSummary,
+  salesDateLabel,
 } from "../../src/lib/imported-sales";
 const a = (
   sales: number | null,
@@ -21,6 +22,19 @@ const sample = () => ({
   ],
 });
 describe("提供された日別売上の照合", () => {
+  it.each([
+    ["2026-08-01", "08/01（土）"],
+    ["2026-09-01", "09/01（火）"],
+    ["2026-10-18", "10/18（日）"],
+    ["2026-10-19", "10/19（月）"],
+    ["2026-10-20", "10/20（火）"],
+    ["2026-10-21", "10/21（水）"],
+    ["2026-10-22", "10/22（木）"],
+    ["2026-10-23", "10/23（金）"],
+    ["2026-10-24", "10/24（土）"],
+  ])("実際のカレンダーから日本語の曜日を表示する: %s", (date, expected) => {
+    expect(salesDateLabel(date)).toBe(expected);
+  });
   it("月初リセット・空欄と明示0円・集計基準日を区別する", () => {
     const data = parseImportedSales(JSON.stringify(sample()));
     expect(salesMonthSummary(data, "2026-10", "honten")).toMatchObject({
