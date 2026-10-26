@@ -2,7 +2,7 @@
 import http from "node:http";
 import { createHash, randomUUID } from "node:crypto";
 const sessions = new Map(),
-  profiles = new Map();
+  profiles = new Map(), codes = new Map();
 function member(email) {
   const hash = createHash("sha256").update(email).digest("hex");
   const id = `${hash.slice(0, 8)}-${hash.slice(8, 12)}-4${hash.slice(13, 16)}-8${hash.slice(17, 20)}-${hash.slice(20, 32)}`;
@@ -45,9 +45,9 @@ function user(profile) {
     email_confirmed_at: "2026-10-25T00:00:00Z",
     aud: "authenticated",
     role: "authenticated",
-    app_metadata: { provider: "email", providers: ["email"] },
+    app_metadata: { provider: profile.email.startsWith("emailonly") ? "email" : "google", providers: ["google"] },
     user_metadata: {},
-    identities: [],
+    identities: [{ provider: "google", identity_data: { email: profile.email, email_verified: true } }],
     created_at: "2026-10-25T00:00:00Z",
   };
 }
@@ -73,48 +73,34 @@ http
     }
     const token = request.headers.authorization?.replace(/^Bearer /, ""),
       profile = sessions.get(token);
-    if (url.pathname === "/auth/v1/otp")
-      return reply(
-        response,
-        body.email?.startsWith("limited") ? 429 : 200,
-        body.email?.startsWith("limited")
-          ? { code: "over_email_send_rate_limit", msg: "rate limited" }
-          : {},
-      );
-    if (url.pathname === "/auth/v1/verify") {
-      if (body.token !== "123456" || !body.email?.endsWith("@example.invalid"))
-        return reply(response, 400, {
-          code: "otp_expired",
-          msg: "invalid code",
-        });
-      const p = member(body.email),
-        now = Math.floor(Date.now() / 1000),
-        payload = {
-          sub: p.user_id,
-          email: p.email,
-          role: "authenticated",
-          aud: "authenticated",
-          iat: now,
-          exp: now + 3600,
-          session_id: randomUUID(),
-        };
-      const jwt =
-        Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString(
-          "base64url",
-        ) +
-        "." +
-        Buffer.from(JSON.stringify(payload)).toString("base64url") +
-        "." +
-        Buffer.from(randomUUID()).toString("base64url");
+    if (url.pathname === "/auth/v1/authorize") {
+      const destination = new URL(url.searchParams.get("redirect_to"));
+      if (destination.origin !== "http://127.0.0.1:3100") return reply(response, 400, {});
+      const email = url.searchParams.get("login_hint");
+      if (email?.startsWith("cancel")) destination.searchParams.set("error", "access_denied");
+      else {
+        const code = randomUUID();
+        codes.set(code, { email: email?.startsWith("mismatch") ? "other@example.invalid" : email, challenge: url.searchParams.get("code_challenge") });
+        destination.searchParams.set("code", code);
+      }
+      response.writeHead(302, { Location: destination.href });
+      return response.end();
+    }
+    if (url.pathname === "/auth/v1/token" && url.searchParams.get("grant_type") === "pkce") {
+      const grant = codes.get(body.auth_code);
+      codes.delete(body.auth_code);
+      const challenge = createHash("sha256").update(body.code_verifier ?? "").digest("base64url");
+      if (!grant || grant.challenge !== challenge || !grant.email?.endsWith("@example.invalid"))
+        return reply(response, 400, { code: "invalid_grant", msg: "invalid code" });
+      const p = member(grant.email), now = Math.floor(Date.now() / 1000);
+      const payload = { sub: p.user_id, email: p.email, role: "authenticated", aud: "authenticated",
+        iat: now, exp: now + 3600, session_id: randomUUID(), app_metadata: user(p).app_metadata,
+        amr: [{ method: p.email.startsWith("emailonly") ? "otp" : "oauth", timestamp: now }] };
+      const jwt = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString("base64url") + "." +
+        Buffer.from(JSON.stringify(payload)).toString("base64url") + "." + Buffer.from(randomUUID()).toString("base64url");
       sessions.set(jwt, p);
-      return reply(response, 200, {
-        access_token: jwt,
-        refresh_token: randomUUID(),
-        token_type: "bearer",
-        expires_in: 3600,
-        expires_at: now + 3600,
-        user: user(p),
-      });
+      return reply(response, 200, { access_token: jwt, refresh_token: randomUUID(), token_type: "bearer",
+        expires_in: 3600, expires_at: now + 3600, user: user(p) });
     }
     if (!profile)
       return reply(response, 401, { code: "bad_jwt", msg: "invalid token" });
@@ -125,9 +111,11 @@ http
       response.writeHead(204);
       return response.end();
     }
-    if (url.pathname === "/rest/v1/rpc/portal_request_access") {
-      if (profile.status === "pending")
-        profile.display_name = body.p_display_name;
+    const allowed = !["unlisted", "emailonly", "revoked"].some((prefix) => profile.email.startsWith(prefix));
+    if (url.pathname === "/rest/v1/rpc/portal_google_allowed") return reply(response, 200, allowed);
+    if (url.pathname === "/rest/v1/rpc/portal_accept_google_invitation") {
+      if (!allowed || profile.status === "disabled" || body.p_display_name !== "テストスタッフ")
+        return reply(response, 403, { message: "denied" });
       return reply(response, 200, profile);
     }
     const admin =

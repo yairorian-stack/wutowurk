@@ -56,6 +56,9 @@ export const getAccess = cache(async (): Promise<Access> => {
     } = await supabase.auth.getUser();
     if (error || !user || !user.email_confirmed_at)
       return { state: "anonymous", member: null };
+    const { data: allowed, error: allowError } = await supabase.rpc("portal_google_allowed");
+    if (allowError) return { state: "unavailable", member: null };
+    if (allowed !== true) return { state: "disabled", member: null };
     const { data, error: profileError } = await supabase
       .from("portal_members")
       .select("user_id,email,display_name,job_title,role,store_id,status")

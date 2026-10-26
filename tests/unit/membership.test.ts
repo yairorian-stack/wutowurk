@@ -49,6 +49,7 @@ describe("ログインと登録情報の入力検証", () => {
     };
     expect(authConfig({})).toBeNull();
     expect(authConfig(base)).not.toBeNull();
+    expect(authConfig({ SUPABASE_URL: base.SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY: base.SUPABASE_PUBLISHABLE_KEY, RENDER_EXTERNAL_URL: "https://pilot.onrender.com" })?.origin).toBe("https://pilot.onrender.com");
     expect(
       authConfig({
         ...base,

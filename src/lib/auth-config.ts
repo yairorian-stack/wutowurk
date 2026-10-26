@@ -9,7 +9,7 @@ export function authConfig(
 ): AuthConfig | null {
   try {
     const url = new URL(env.SUPABASE_URL ?? ""),
-      origin = new URL(env.PORTAL_ORIGIN ?? ""),
+      origin = new URL(env.PORTAL_ORIGIN ?? env.RENDER_EXTERNAL_URL ?? ""),
       key = env.SUPABASE_PUBLISHABLE_KEY ?? "";
     const local = (v: URL) =>
       v.protocol === "http:" &&

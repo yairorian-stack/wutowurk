@@ -20,7 +20,7 @@ export default async function Page() {
         </h1>
         <p className="auth-lead">
           {access.state === "pending"
-            ? "メールの本人確認が完了しました。所属店舗・役職・権限の設定後に利用できます。"
+            ? "Googleアカウントの本人確認が完了しました。所属店舗・役職・権限の設定後に利用できます。"
             : "現在、社内画面を開けません。管理者へお問い合わせください。"}
         </p>
         {access.member && (

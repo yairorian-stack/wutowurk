@@ -16,5 +16,4 @@ services:
         sync: false
       - key: SUPABASE_PUBLISHABLE_KEY
         sync: false
-      - key: PORTAL_ORIGIN
-        sync: false
+    # Render supplies RENDER_EXTERNAL_URL; PORTAL_ORIGIN can override it for a custom domain.
