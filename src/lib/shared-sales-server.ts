@@ -21,7 +21,7 @@ export async function readSharedSales(
 ): Promise<SharedSalesState> {
   if (
     member.status !== "approved" ||
-    !["manager", "company", "system"].includes(member.role)
+    !["staff", "manager", "company", "system"].includes(member.role)
   )
     return { status: "restricted" };
   try {

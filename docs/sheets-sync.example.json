@@ -9,6 +9,12 @@
     "firstDataRow": 3,
     "lastDataRow": 368
   },
+  "staffAccess": {
+    "spreadsheetId": "REPLACE_WITH_PRIVATE_STAFF_LEDGER_SPREADSHEET_ID",
+    "tab": "スタッフ権限",
+    "sheetId": 0,
+    "range": "A1:G500"
+  },
   "cashSources": [
     {
       "spreadsheetId": "REPLACE_WITH_PRIVATE_HONTEN_CASH_SPREADSHEET_ID",

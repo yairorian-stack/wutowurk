@@ -2,6 +2,7 @@
 import { createSign, randomUUID } from "node:crypto";
 import { loadTsModule } from "./load-ts-module.mjs";
 const { parseFiscalSalesGrid, parseCashGrid, crossCheckCashSales } = await loadTsModule("src/lib/sheets-import.ts");
+const { parseStaffAccessGrid } = await loadTsModule("src/lib/staff-access-import.ts");
 let supabase, serviceKey;
 const runId = process.env.GITHUB_RUN_ID ? `${process.env.GITHUB_RUN_ID}-${process.env.GITHUB_RUN_ATTEMPT ?? "1"}` : randomUUID();
 async function jsonFetch(url, options = {}) {
@@ -26,9 +27,10 @@ try {
   const account = JSON.parse(process.env.SHEETS_SERVICE_ACCOUNT_JSON ?? "null");
   if (!config || !account || !/^[^@\s]+@[^@\s]+\.iam\.gserviceaccount\.com$/.test(account.client_email) || typeof account.private_key !== "string") throw new Error("SYNC_FAILED");
   if (!Array.isArray(config.cashSources) || !config.cashSources.length || config.cashSources.length>24) throw new Error("SYNC_FAILED");
-  for (const source of [config.sales,...config.cashSources]) {
+  for (const source of [config.sales,...config.cashSources,...(config.staffAccess ? [config.staffAccess] : [])]) {
     if (!source || !/^[\w-]{20,100}$/.test(source.spreadsheetId) || typeof source.tab !== "string" || !/^[A-Z]+1:[A-Z]+\d+$/.test(source.range)) throw new Error("SYNC_FAILED");
   }
+  if (config.staffAccess && (!Number.isInteger(config.staffAccess.sheetId) || !/^A1:G(?:[2-9]\d?|[1-4]\d{2}|500)$/.test(config.staffAccess.range) || !config.staffAccess.tab.trim())) throw new Error("SYNC_FAILED");
   const months = new Set();
   for (const source of config.cashSources) {
     if (!["honten","816"].includes(source.store) || !Number.isInteger(source.year) || source.year<2026 || source.year>2100 || !Number.isInteger(source.month) || source.month<1 || source.month>12 || typeof source.enabled!=="boolean" || !/^[a-zA-Z0-9:_-]{1,160}$/.test(source.sourceId)) throw new Error("SYNC_FAILED");
@@ -88,6 +90,7 @@ try {
   const today = new Intl.DateTimeFormat("en-CA", { timeZone:"Asia/Tokyo",year:"numeric",month:"2-digit",day:"2-digit" }).format(new Date());
   const grid=await readFiscalSales(config.sales);
   const sales=parseFiscalSalesGrid(grid.formatted,grid.effective,config.sales,today);
+  const staffRows=config.staffAccess ? parseStaffAccessGrid(await read(config.staffAccess)) : null;
   if (!dryRun) await rpc("portal_apply_sales_sync",{p_run_id:runId,p_sales:sales});
   let failed=false, pending=false;
   for (const source of config.cashSources) {
@@ -105,6 +108,17 @@ try {
       if (!dryRun) await rpc("portal_record_cash_failure",{p_store_id:source.store,p_month:month,p_code:error instanceof Error ? error.message : "SYNC_FAILED"});
       console.error("Cash month not published; previous verified values retained. Review private source/status.");
     }
+  }
+  if (staffRows) {
+    if (dryRun) {
+      const enabled=staffRows.filter(row=>row.enabled).length;
+      console.log(`Staff access dry run validated ${staffRows.length} rows (${enabled} enabled, ${staffRows.length-enabled} disabled); no permission changes applied.`);
+    } else {
+      const result=await rpc("portal_apply_staff_access_sync",{p_run_id:runId,p_staff:staffRows});
+      console.log(`Staff access sync applied: ${result.added} added, ${result.updated} updated, ${result.disabled} disabled.`);
+    }
+  } else {
+    console.log("Staff access sync is not configured; sales and cash sync continued unchanged.");
   }
   if (!dryRun) await rpc("portal_finish_sheets_run",{p_run_id:runId});
   if (failed) process.exitCode=1;

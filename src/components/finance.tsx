@@ -18,7 +18,14 @@ import {
   Wallet,
   X,
 } from "lucide-react";
-import { stores, today, type Session, type StoreId } from "@/lib/domain";
+import {
+  canRead,
+  isGlobal,
+  stores,
+  today,
+  type Session,
+  type StoreId,
+} from "@/lib/domain";
 import {
   balanceAt,
   cashCategoryLabel,
@@ -64,9 +71,15 @@ type Modal =
   | { kind: "target"; storeId: StoreId }
   | null;
 export function Finance(props: Props) {
+  const canView =
+    props.scope === "all"
+      ? isGlobal(props.session.role)
+      : canRead(props.session, props.scope);
   if (
-    !canUseFinance(props.session) ||
-    (props.scope !== "all" && !canUseFinance(props.session, props.scope))
+    !canView ||
+    (props.session.role !== "staff" &&
+      (!canUseFinance(props.session) ||
+        (props.scope !== "all" && !canUseFinance(props.session, props.scope))))
   )
     return (
       <section className="panel finance-restricted">
@@ -78,8 +91,18 @@ export function Finance(props: Props) {
         </p>
       </section>
     );
+  if (props.session.role === "staff")
+    return (
+      <FinanceDataMode scope={props.scope} canEnterDaily={false}>
+        <section className="panel finance-restricted">
+          <LockKeyhole size={34} />
+          <h1>売上・日報・現金出納帳</h1>
+          <p>共有実績の準備中、または読み込み待ちです。</p>
+        </section>
+      </FinanceDataMode>
+    );
   return (
-    <FinanceDataMode scope={props.scope}>
+    <FinanceDataMode scope={props.scope} canEnterDaily>
       <FinanceWorkspace {...props} />
     </FinanceDataMode>
   );
