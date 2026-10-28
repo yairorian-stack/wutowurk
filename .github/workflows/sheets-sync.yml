@@ -15,9 +15,8 @@ concurrency:
   cancel-in-progress: false
 jobs:
   sync:
-    # Daily runs stay disabled until secrets are configured and the repository
-    # variable SHEETS_SYNC_ENABLED is explicitly set to true.
-    if: github.event_name == 'workflow_dispatch' || vars.SHEETS_SYNC_ENABLED == 'true'
+    # Required production credentials were validated by a successful live import.
+    # Scheduled runs execute daily; manual runs remain available for dry-run validation.
     runs-on: ubuntu-latest
     environment: production-data-sync
     timeout-minutes: 10
