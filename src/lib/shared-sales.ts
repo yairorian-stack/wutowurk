@@ -1,11 +1,15 @@
 import { z } from "zod";
 import { parseImportedSales, type ImportedSales } from "./imported-sales";
+import type { ManagerCashExpense, ManagerDailyReport } from "./manager-daily";
 export type SharedCashRow = { transaction_date: string; source_order: number; category: string; description: string; receipt_jpy: number; payment_jpy: number; balance_jpy: number };
 export type SharedFinanceDetails = {
   sync?: { attempted_at: string; last_success_at: string | null; status: string };
   cashMonths?: { store_id: "honten" | "816"; month: string; opening_jpy: number; rows: SharedCashRow[] }[];
   cashStatuses?: { store_id: "honten" | "816"; month: string; status: string; message_code: string; last_success_at: string | null }[];
   cashUnavailable?: boolean;
+  managerDailyStatus?: "ready" | "setup-required" | "unavailable";
+  managerReports?: ManagerDailyReport[];
+  managerExpenses?: ManagerCashExpense[];
 };
 export type SharedSalesState = SharedFinanceDetails & (
   | { status: "ready"; data: ImportedSales }

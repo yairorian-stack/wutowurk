@@ -100,10 +100,10 @@ export function authJson(body: unknown, status = 200) {
     headers: { "Cache-Control": "no-store, private", Vary: "Cookie, Origin" },
   });
 }
-export async function readSmallJson(request: Request) {
+export async function readSmallJson(request: Request, maxBytes = 4096) {
   if (!request.headers.get("content-type")?.startsWith("application/json"))
     throw new Error("invalid-input");
-  if (Number(request.headers.get("content-length") ?? "0") > 4096)
+  if (Number(request.headers.get("content-length") ?? "0") > maxBytes)
     throw new Error("invalid-input");
   const reader = request.body?.getReader();
   if (!reader) throw new Error("invalid-input");
@@ -113,7 +113,7 @@ export async function readSmallJson(request: Request) {
     const { value, done } = await reader.read();
     if (done) break;
     length += value.byteLength;
-    if (length > 4096) {
+    if (length > maxBytes) {
       await reader.cancel();
       throw new Error("invalid-input");
     }

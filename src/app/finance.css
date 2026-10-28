@@ -118,6 +118,122 @@
 .finance-sample-choice > button {
   flex-shrink: 0;
 }
+.manager-entry-launcher {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 28px;
+  padding: 28px;
+  margin-bottom: 24px;
+  border-top: 4px solid #6f8d58;
+  background: linear-gradient(135deg, #fffef7 0%, #f1f5e9 100%);
+}
+.manager-entry-launcher > div:first-child {
+  flex: 1;
+  min-width: 0;
+}
+.manager-entry-launcher h2,
+.manager-report-list h2,
+.manager-entry-status h2 {
+  color: #36563e;
+  font-size: 21px;
+  line-height: 1.5;
+}
+.manager-entry-launcher > div:first-child > p:last-child,
+.manager-entry-status p {
+  color: #64745b;
+  font-size: 13px;
+  line-height: 1.9;
+  margin-top: 8px;
+}
+.manager-entry-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+.manager-entry-status {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 24px;
+  padding: 22px 24px;
+}
+.manager-entry-status > svg {
+  flex: 0 0 auto;
+  color: #668055;
+  margin-top: 3px;
+}
+.manager-daily-form {
+  gap: 20px;
+}
+.manager-daily-form fieldset {
+  min-width: 0;
+  border: 1px solid #dbe3d1;
+  border-radius: 8px;
+  padding: 18px;
+}
+.manager-daily-form fieldset > legend {
+  color: #4f6845;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 0 7px;
+}
+.manager-sales-total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 15px 17px;
+  margin: 14px 0 18px;
+  border-radius: 7px;
+  background: #eef3e6;
+  color: #506848;
+}
+.manager-sales-total span {
+  font-size: 13px;
+}
+.manager-sales-total strong {
+  color: #365b3d;
+  font-size: 25px;
+  font-variant-numeric: tabular-nums;
+}
+.manager-tender-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.manager-expense-row {
+  display: grid;
+  grid-template-columns: minmax(130px, 0.8fr) minmax(180px, 1.4fr) minmax(120px, 0.7fr) auto;
+  align-items: end;
+  gap: 10px;
+  padding: 13px;
+  margin: 12px 0;
+  border-radius: 7px;
+  background: #f4f6ee;
+}
+.manager-expense-row .icon-button {
+  margin-bottom: 3px;
+}
+.manager-report-list {
+  margin-top: 24px;
+}
+.manager-report-list > h2 {
+  margin-bottom: 18px;
+}
+.manager-report-list th small {
+  display: block;
+  color: #77866e;
+  font-size: 10px;
+  font-weight: 500;
+  margin-top: 4px;
+}
+.manager-tender-summary {
+  min-width: 160px;
+  font-size: 11px;
+  line-height: 1.8;
+}
 @media (max-width: 700px) {
   .finance-not-connected {
     padding: 24px 18px;
@@ -148,6 +264,38 @@
   }
   .finance-source-banner {
     padding: 16px;
+  }
+  .manager-entry-launcher {
+    align-items: stretch;
+    flex-direction: column;
+    padding: 22px 17px;
+  }
+  .manager-entry-actions {
+    justify-content: stretch;
+  }
+  .manager-entry-actions .button {
+    justify-content: center;
+    width: 100%;
+  }
+  .manager-entry-status {
+    padding: 18px 16px;
+  }
+  .manager-entry-launcher h2,
+  .manager-report-list h2,
+  .manager-entry-status h2 {
+    font-size: 18px;
+  }
+  .manager-daily-form fieldset {
+    padding: 15px 12px;
+  }
+  .manager-tender-grid {
+    grid-template-columns: 1fr;
+  }
+  .manager-expense-row {
+    grid-template-columns: 1fr;
+  }
+  .manager-expense-row .icon-button {
+    justify-self: end;
   }
 }
 .monthly-targets {

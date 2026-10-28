@@ -16,7 +16,7 @@ export function SharedCashbook({shared,scope}:{shared:SharedSalesState;scope:str
   return <>
     <section className="panel" aria-label="自動取込の状況">
       <p>最終更新日時：{shared.sync?.last_success_at?dateTime(shared.sync.last_success_at):"定期取込の開始待ち"}（日本時間）</p>
-      <p role="status">{shared.sync?.status==="failed"?"取込失敗：前回の正常な実績を表示しています。管理者による確認が必要です。":shared.sync?.last_success_at?"売上の取込成功。出納帳は店舗・月ごとの結果をご確認ください。":"登録済みの実績を表示しています。毎日の自動更新は接続設定後に開始します。"}</p>
+      <p role="status">{shared.sync?.status==="failed"?"取込失敗：前回の正常な実績を表示しています。管理者による確認が必要です。":shared.sync?.last_success_at?"売上の取込成功。店長日報は保存後すぐ、売上・労働時間・出納帳へ反映します。":"登録済みの実績を表示しています。店長日報は保存後すぐ反映します。"}</p>
       {shared.cashUnavailable&&<p role="alert">一部の出納帳を読み込めませんでした。残高を0円として表示していません。</p>}
     </section>
     <section className="panel" aria-labelledby="cashbook-status-title">
@@ -32,7 +32,7 @@ export function SharedCashbook({shared,scope}:{shared:SharedSalesState;scope:str
         return <div key={`${month.store_id}/${month.month}`}>
           <h3>{label}・{month.month.slice(0,7)}</h3>
           <p>前月繰越・開始残高 {yen(month.opening_jpy)}</p>
-          <p className="small muted">原本の入出金・残高を表示しています。銀行への入金は店舗現金からの出金です。実際に数えた現金との過不足は未照合です。</p>
+          <p className="small muted">原本の入出金・残高を基準に、店長日報を登録した日は、その売上・決済内訳・レシート支払いを反映しています。銀行への入金は店舗現金からの出金です。実際に数えた現金との過不足は未照合です。</p>
           <div className="local-table-scroll"><table className="local-table"><caption>{label}現金出納帳・{month.month.slice(0,7)}（{verified?"前回成功時点の照合済み明細":"営業日報との照合待ち"}）</caption><thead><tr>{["日付","科目","概要","入金","出金","残高"].map(v=><th key={v} scope="col">{v}</th>)}</tr></thead><tbody>
             {month.rows.map((r,index)=>{
               const span=dateRowSpan(month.rows,index);
