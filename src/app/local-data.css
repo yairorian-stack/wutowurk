@@ -176,6 +176,9 @@
 .local-table tbody th {
   background: #fafaf5;
 }
+.local-table .cash-date-group {
+  vertical-align: top;
+}
 .local-table tbody tr:last-child > * {
   border-bottom: 0;
 }
