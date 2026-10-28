@@ -1,0 +1,220 @@
+.auth-page {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 36px 20px;
+  background: radial-gradient(ellipse at top, #e7edde 0%, #f6f5f0 58%);
+  color: #29473b;
+}
+.auth-brand {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 26px;
+}
+.auth-brand strong {
+  letter-spacing: 0.09em;
+  font-size: 21px;
+}
+.auth-brand > span {
+  width: 100%;
+  text-align: center;
+  font-size: 10px;
+  color: #7b886e;
+  letter-spacing: 0.25em;
+}
+.auth-card {
+  width: 100%;
+  max-width: 470px;
+  border-radius: 20px;
+  border: 1px solid #e0e6d6;
+  background: #fffef9;
+  padding: 34px;
+  box-shadow: 0 16px 60px #29473b0a;
+}
+.auth-icon {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 58px;
+  height: 58px;
+  margin-bottom: 24px;
+  border-radius: 50%;
+  background: #edf3e7;
+  color: #678252;
+}
+.auth-card h1 {
+  font-size: 26px;
+  font-weight: 650;
+  margin: 10px 0 14px;
+  line-height: 1.5;
+}
+.auth-lead {
+  color: #798375;
+  font-size: 14px;
+  line-height: 1.9;
+  margin-bottom: 24px;
+}
+.auth-card form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.auth-card label {
+  font-size: 14px;
+  font-weight: 600;
+  display: block;
+}
+.auth-card label > span {
+  font-size: 10px;
+  color: #aa7957;
+  margin-left: 10px;
+  font-weight: 400;
+}
+.auth-card input {
+  width: 100%;
+  display: block;
+  padding: 13px;
+  min-height: 48px;
+  margin-top: 10px;
+  border: 1px solid #dce3d2;
+  border-radius: 9px;
+  background: white;
+  font-size: 16px;
+}
+.auth-card input:read-only {
+  background: #f4f6ef;
+  color: #78856e;
+}
+.auth-card .button {
+  min-height: 48px;
+  justify-content: center;
+  width: 100%;
+}
+.auth-card .button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.auth-notice {
+  border-radius: 10px;
+  padding: 16px;
+  margin: 24px 0;
+  background: #f7eddf;
+  color: #806448;
+  font-size: 13px;
+  line-height: 1.9;
+}
+.auth-notice strong {
+  display: block;
+  font-weight: 600;
+}
+.auth-notice p {
+  margin-top: 6px;
+}
+.auth-footnote {
+  border-top: 1px solid #e7ebdf;
+  padding-top: 20px;
+  margin-top: 24px;
+  font-size: 12px;
+  line-height: 1.9;
+  color: #839079;
+}
+.auth-motto {
+  font-size: 12px;
+  margin-top: 24px;
+  letter-spacing: 0.06em;
+  color: #839079;
+}
+.auth-code-note {
+  font-size: 13px;
+  padding: 14px;
+  line-height: 1.9;
+  background: #edf3e7;
+  border-radius: 9px;
+}
+.member-profile {
+  display: grid;
+  gap: 12px;
+  margin: 20px 0;
+}
+.member-profile > div {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr);
+  gap: 10px;
+  font-size: 14px;
+  line-height: 1.8;
+}
+.member-profile dt {
+  color: #7c8774;
+}
+.member-profile dd {
+  overflow-wrap: anywhere;
+}
+.member-management {
+  padding: 24px;
+  margin: 24px 0;
+}
+.member-management h2 {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+.member-request {
+  padding: 20px 0;
+  border-top: 1px solid #e2e7da;
+}
+.member-request h3 {
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.member-request .member-email {
+  font-size: 13px;
+  color: #7c8774;
+  overflow-wrap: anywhere;
+}
+.member-request form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: end;
+  margin-top: 18px;
+}
+.member-request label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 12px;
+}
+.member-request select {
+  min-height: 44px;
+  border: 1px solid #dce3d2;
+  padding: 10px;
+  border-radius: 7px;
+  background: white;
+  max-width: 100%;
+}
+@media (max-width: 500px) {
+  .auth-card {
+    padding: 26px 20px;
+  }
+  .auth-page {
+    padding: 24px 16px;
+  }
+  .auth-card h1 {
+    font-size: 23px;
+  }
+  .member-management {
+    padding: 18px 14px;
+  }
+  .member-request label,
+  .member-request button {
+    width: 100%;
+  }
+}
+
+.auth-backup { margin-top: 24px; border-top: 1px solid #e0e6d6; padding-top: 18px; }
+.auth-backup summary { cursor: pointer; color: #426048; font-size: 14px; }

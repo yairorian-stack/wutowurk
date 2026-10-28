@@ -1,0 +1,21 @@
+# Review in your own Render account. This file does not create a service or accept a contract.
+services:
+  - type: web
+    name: wuto-wurk-growth-portal
+    runtime: node
+    plan: free
+    region: singapore
+    branch: codex/growth-portal-finance
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start -- --port $PORT
+    healthCheckPath: /login
+    envVars:
+      - key: NODE_VERSION
+        value: 24.19.0
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_PUBLISHABLE_KEY
+        sync: false
+    # Render supplies RENDER_EXTERNAL_URL; PORTAL_ORIGIN can override it for a custom domain.
+    # Optional: add PORTAL_OTP_ALLOWED_EMAILS privately in Render Environment after OTP DB setup.
+    # Keep Google enabled until real OTP delivery and login have both been verified.

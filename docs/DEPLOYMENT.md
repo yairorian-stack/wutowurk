@@ -1,0 +1,41 @@
+# 確認用サイトの公開
+
+## 現在の変更：ログイン接続待ちで閉じています
+
+氏名・メール確認・管理者承認を必須にする依頼により、GitHub Pagesの公開物はログイン準備画面だけに変更します。`#/daily` 等のURLでも社内機能を配信しません。実スタッフの名簿・メール・実売上・トークンを含めません。
+
+本番ログインはNext.jsサーバーとSupabaseの接続が必要です。アカウント未作成のため、外部サービスへの作成・契約・本番デプロイ・実メール確認は未実施です。[接続手順](AUTH_SETUP.md)と `render.yaml` を用意しました。`npm run build:pages` は閉じた公開画面、`npm run build:review` は非公開の回帰試験用プロトタイプを生成します。以下の画面公開記録は、この変更前の履歴です。
+
+2026年10月21日、依頼者から「確認用に公開してよい」と承認あり。有料契約は行っていない。
+
+## GitHubへ配置済み
+
+- リポジトリ: `yairorian-stack/wutowurk`（公開リポジトリであることを確認）
+- 公開用ブランチ: `gh-pages`
+- コミット: `fc65179bccf8544a6a70d7298e0694c7e6cee230`
+- ファイル: `index.html`, `.nojekyll`, `robots.txt`, `THIRD_PARTY_NOTICES.txt`
+- mainブランチは変更していない。作業中のNext.jsソースは既存チェックアウトに保持。
+
+自己完結型のサンプル用HTML。個人情報・秘密情報・認証キー・実データを含めない。画面操作と保存はブラウザー内で完結し、共有DBや本番認証はない。検索エンジン向けにnoindexとrobots.txtを設定しているが、アクセス制限ではない。第三者ライブラリのライセンスは同梱した。
+
+その後、依頼者の画面でGitHub Pagesが「Your site is live」、公開元が `gh-pages` / `/(root)` であることを確認した。今回の売上・日報・出納帳サンプルも同じブランチへの更新で反映する。`npm run build:pages` で `out-pages/` に公開物を再生成する。公開URLでの新画面は `https://yairorian-stack.github.io/wutowurk/#/daily`。最新の公開物のコミットはリモートの `gh-pages` HEAD を正とする。
+
+自己評価の入力画面は `https://yairorian-stack.github.io/wutowurk/#/self-evaluation`。公開物は未記入のフォームと制度案のみを含み、利用者が入力した氏名・評価・振り返りは公開ファイルへ組み込まない。
+
+シフト画面は `https://yairorian-stack.github.io/wutowurk/#/shifts`。共通CSVの入力画面と明示的に開く架空サンプルのみを公開する。Airシフトからの自動取得は未接続。売上JSON読み込み画面も公開ビルドへ含むが、依頼者の実額JSON・実額入り確認版HTMLはリポジトリ外に保持し、承認なしに公開しない。
+
+本店ゴミ出し画面は `https://yairorian-stack.github.io/wutowurk/#/garbage`。11月の依頼者提供日程を「公式PDF未照合」「自動通知未稼働」と明示して公開する。メール宛先、LINE秘密値、Googleプロパティを公開HTMLへ含めない。GASコードの設置・OAuth・トリガーは別途Google側で実施するもので、Pagesへ公開しても自動通知は開始されない。
+
+## GitHub側の設定（初回のみ・現在は設定済み）
+
+管理者が https://github.com/yairorian-stack/wutowurk/settings/pages を開き、次のように設定する。
+
+1. Build and deployment → Source: `Deploy from a branch`
+2. Branch: `gh-pages`、フォルダー: `/(root)`
+3. `Save`
+
+確認用サイトのURL: https://yairorian-stack.github.io/wutowurk/
+
+現在のクラウド環境では `api.github.com` と `yairorian-stack.github.io` への通信がネットワークポリシーで拒否されている。APIによるPages設定変更と外部の公開URLの応答検証は未実行。Git push成功およびgithub.com上の公開用ブランチのファイル表示は確認済み。URLを閲覧可能と断定しない。
+
+この環境から管理・公開確認を再開する場合は、環境設定の既存カスタム許可先を保持して `api.github.com` と `yairorian-stack.github.io` を追加する。設定反映後にAPI権限・Pages状態・公開URLの応答を実測する。Git認証の成功だけでAPIの管理権限があるとは扱わない。
