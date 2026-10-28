@@ -1,9 +1,15 @@
 "use client";
-import type { SharedSalesState } from "@/lib/shared-sales";
+import type { SharedCashRow, SharedSalesState } from "@/lib/shared-sales";
 import { salesDateLabel } from "@/lib/imported-sales";
 import { yen } from "@/lib/finance";
 const dateTime=(value:string)=>new Intl.DateTimeFormat("ja-JP",{dateStyle:"medium",timeStyle:"short",timeZone:"Asia/Tokyo"}).format(new Date(value));
 const storeName=(id:string)=>id==="honten"?"本店":"羽ノ浦店";
+const dateRowSpan=(rows:SharedCashRow[],index:number)=>{
+  if(index>0&&rows[index-1].transaction_date===rows[index].transaction_date)return 0;
+  let end=index+1;
+  while(end<rows.length&&rows[end].transaction_date===rows[index].transaction_date)end++;
+  return end-index;
+};
 export function SharedCashbook({shared,scope}:{shared:SharedSalesState;scope:string}){
   const months=(shared.cashMonths??[]).filter(m=>scope==="all" || m.store_id===scope);
   const statuses=(shared.cashStatuses??[]).filter(m=>scope==="all" || m.store_id===scope);
@@ -28,7 +34,10 @@ export function SharedCashbook({shared,scope}:{shared:SharedSalesState;scope:str
           <p>前月繰越・開始残高 {yen(month.opening_jpy)}</p>
           <p className="small muted">原本の入出金・残高を表示しています。銀行への入金は店舗現金からの出金です。実際に数えた現金との過不足は未照合です。</p>
           <div className="local-table-scroll"><table className="local-table"><caption>{label}現金出納帳・{month.month.slice(0,7)}（{verified?"前回成功時点の照合済み明細":"営業日報との照合待ち"}）</caption><thead><tr>{["日付","科目","概要","入金","出金","残高"].map(v=><th key={v} scope="col">{v}</th>)}</tr></thead><tbody>
-            {month.rows.map(r=><tr key={r.source_order}><th scope="row"><time dateTime={r.transaction_date}>{salesDateLabel(r.transaction_date)}</time></th><td>{r.category}</td><td>{r.description}</td><td>{r.receipt_jpy?yen(r.receipt_jpy):"—"}</td><td>{r.payment_jpy?yen(r.payment_jpy):"—"}</td><td>{yen(r.balance_jpy)}</td></tr>)}
+            {month.rows.map((r,index)=>{
+              const span=dateRowSpan(month.rows,index);
+              return <tr key={r.source_order}>{span>0&&<th className="cash-date-group" scope="rowgroup" rowSpan={span}><time dateTime={r.transaction_date}>{salesDateLabel(r.transaction_date)}</time></th>}<td>{r.category}</td><td>{r.description}</td><td>{r.receipt_jpy?yen(r.receipt_jpy):"—"}</td><td>{r.payment_jpy?yen(r.payment_jpy):"—"}</td><td>{yen(r.balance_jpy)}</td></tr>;
+            })}
           </tbody></table></div>
         </div>;
       })}
