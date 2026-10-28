@@ -407,7 +407,7 @@ function PortalContent({ view }: { view: View }) {
               WUTO-WURK <i />
               GROWTH PORTAL
             </span>
-            <p>一皿から、その土地を好きになる。</p>
+            <p>人に良いを基本とし 心の温もりを与え　ワクワクと感動を創造し続けます</p>
             <small>© {today().slice(0, 4)} 有限会社ウト・ウーク</small>
           </footer>
         </main>
