@@ -275,3 +275,19 @@ test("月別不一致でも前回の羽ノ浦10月を維持し、本店管理者
   expect(await page.content()).not.toContain("架空の羽ノ浦明細");
   await expect(page.getByText("羽ノ浦店・2026-08",{exact:false})).toHaveCount(0);
 });
+
+test("2046年ビジョンの指定文言を大きく表示し、狭い画面でも収まる",async({page},info)=>{
+  await login(page,`owner-vision-${info.project.name}@example.invalid`);await expect(page).toHaveURL("http://127.0.0.1:3100/");await page.goto("/vision");
+  const heading=page.getByRole("heading",{name:"世界１０ヵ国で、地域に必要とさせる飲食ブランドになる！！",exact:true});
+  await expect(heading).toBeVisible();
+  const mission=page.locator(".vision-mission");
+  expect(await mission.textContent()).toBe("人に良いを基本とし 心の温もりを与え　ワクワクと感動を創造し続けます");
+  await expect(page.locator(".vision-page-banner h2")).not.toContainText("一皿から");
+  for(const width of info.project.name==="mobile"?[320,390]:[1024,1440]){
+    await page.setViewportSize({width,height:1000});
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+    const bounds=await heading.boundingBox();expect(bounds!.x).toBeGreaterThanOrEqual(0);expect(bounds!.x+bounds!.width).toBeLessThanOrEqual(width);
+    expect(await heading.evaluate(el=>parseFloat(getComputedStyle(el).fontSize))).toBeGreaterThanOrEqual(28);
+    expect(await heading.evaluate(el=>parseFloat(getComputedStyle(el).fontSize))).toBeGreaterThan((await mission.evaluate(el=>parseFloat(getComputedStyle(el).fontSize)))*1.5);
+  }
+});

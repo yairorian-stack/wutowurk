@@ -52,16 +52,8 @@ export function VisionMap({
             <span />
             OUR VISION 2046
           </span>
-          <h2>
-            一皿から、
-            <br />
-            その土地を好きになる。
-          </h2>
-          <p>
-            世界10カ国で、その地域の人々から
-            <br />
-            必要とされる飲食ブランドになる。
-          </p>
+          <h2>世界１０ヵ国で、地域に必要とさせる飲食ブランドになる！！</h2>
+          <p className="vision-mission">人に良いを基本とし 心の温もりを与え　ワクワクと感動を創造し続けます</p>
         </div>
         <BrandArt />
         <div className="vision-number">

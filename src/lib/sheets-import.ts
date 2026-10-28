@@ -58,6 +58,49 @@ export function parseSalesGrid(grid: unknown[][], blocks: SalesBlock[], asOf: st
   if (!rows.length) return fail();
   return rows;
 }
+export type FiscalSalesLayout = { fiscalYearStart: number; firstDataRow: number; lastDataRow: number };
+// L:V: date, Honten daily/month/YoY, Hanoura daily/month/YoY, totals, YoY, store labor hours.
+export function parseFiscalSalesGrid(formatted: unknown[][], effective: unknown[][], config: FiscalSalesLayout, asOf: string): SyncSale[] {
+  const {fiscalYearStart:year,firstDataRow,lastDataRow}=config;
+  if (!Number.isInteger(year)||year<2020||year>2100||!Number.isInteger(firstDataRow)||firstDataRow<2||!Number.isInteger(lastDataRow)||lastDataRow<firstDataRow||lastDataRow-firstDataRow>400||!/^\d{4}-\d{2}-\d{2}$/.test(asOf)) return fail();
+  const header=(column:number)=>formatted.slice(0,firstDataRow-1).map(r=>cell(r[column])).join("").replace(/\s/g,"");
+  if (!/日程|日付/.test(header(0))||!header(1).includes("本店")||!header(1).includes("売上")||!header(4).includes("羽ノ浦")||!header(4).includes("売上")||!header(9).includes("本店")||!header(10).includes("羽ノ浦")||!(/労時|労働/.test(header(9)))||!(/労時|労働/.test(header(10)))) return fail();
+  const start=`${year}-08-01`,end=`${year+1}-07-31`,dates=new Set<string>();
+  const totals=new Map<string,number>(),rows:SyncSale[]=[];
+  let previous="";
+  for(let index=firstDataRow-1;index<lastDataRow;index++){
+    const display=formatted[index]??[],raw=effective[index]??[],label=cell(display[0]);
+    if(!label){if(cell(raw[1])||cell(raw[4]))return fail();continue;}
+    const match=label.match(/^(?:\d{4}年)?(\d{1,2})月/);if(!match)return fail();
+    const month=Number(match[1]),calendarYear=month>=8?year:year+1;
+    const date=japaneseSheetDate(label,calendarYear,[month]);
+    // Both representations come from one GridData response, not two snapshots.
+    if(typeof raw[0]==="number"){
+      if(!Number.isInteger(raw[0])||new Date(Date.UTC(1899,11,30)+raw[0]*86400000).toISOString().slice(0,10)!==date)return fail();
+    }else if(cell(raw[0])!==label)return fail();
+    if(date<start||date>end||date<=previous||dates.has(date))return fail();
+    previous=date;dates.add(date);
+    for(const [store,column,cumulativeColumn,hoursColumn] of [["honten",1,2,9],["816",4,5,10]] as const){
+      const amount=raw[column];
+      if(amount===null||amount===undefined||amount==="")continue; // Ignore every formula-only aggregate for a blank daily cell.
+      if(typeof amount!=="number"||!Number.isSafeInteger(amount)||amount<0||amount>10000000000||date>asOf)return fail();
+      const hours=raw[hoursColumn];let minutes:number|null=null;
+      if(hours!==null&&hours!==undefined&&hours!==""){
+        if(typeof hours!=="number"||!Number.isFinite(hours)||hours<0||hours>10000)return fail();
+        minutes=Math.round(hours*60);
+      }
+      const key=`${store}/${date.slice(0,7)}`,total=(totals.get(key)??0)+amount;
+      if(!Number.isSafeInteger(total)||total>10000000000)return fail();totals.set(key,total);
+      const cumulative=raw[cumulativeColumn];
+      if(cumulative!==null&&cumulative!==undefined&&cumulative!==""&&(typeof cumulative!=="number"||cumulative!==total))return fail();
+      rows.push({store_id:store,sales_date:date,sales_jpy:amount,labor_minutes:minutes});
+    }
+  }
+  const expectedDays=(Date.parse(`${end}T00:00:00Z`)-Date.parse(`${start}T00:00:00Z`))/86400000+1;
+  if(dates.size!==expectedDays||!dates.has(start)||!dates.has(end)||!rows.length)return fail();
+  return rows;
+}
+
 export type CashBlock = { store?: "honten" | "816"; year: number; month: number; firstRow: number; source: string; headerRows: number;
   yearCell?: [number, number]; monthCell?: [number, number]; labelsRow?: number;
   openingValueRow?: number; firstTransactionDate?: string };

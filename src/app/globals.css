@@ -3420,3 +3420,29 @@ h1 {
     background: white;
   }
 }
+
+/* The vision page's primary message retains its priority at narrow widths. */
+.vision-page-banner .vision-banner-copy {
+  width: calc(100% - 130px);
+  max-width: 900px;
+  min-width: 0;
+}
+.vision-page-banner .vision-banner-copy h2 {
+  font-size: clamp(1.9rem, 4.2vw, 3.25rem);
+  font-weight: 700;
+  line-height: 1.5;
+  letter-spacing: 0.045em;
+  overflow-wrap: anywhere;
+  line-break: strict;
+}
+.vision-page-banner .vision-banner-copy > .vision-mission {
+  max-width: none;
+  font-size: clamp(0.95rem, 1.5vw, 1.125rem);
+  color: #d9e1d1;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 640px) {
+  .vision-page-banner { padding-bottom: 110px; }
+  .vision-page-banner .vision-banner-copy { width: 100%; }
+}

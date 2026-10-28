@@ -1,7 +1,7 @@
 // Runs only in the private GitHub Actions environment. Never logs source rows or credentials.
 import { createSign, randomUUID } from "node:crypto";
 import { loadTsModule } from "./load-ts-module.mjs";
-const { parseSalesGrid, parseCashGrid, crossCheckCashSales } = await loadTsModule("src/lib/sheets-import.ts");
+const { parseFiscalSalesGrid, parseCashGrid, crossCheckCashSales } = await loadTsModule("src/lib/sheets-import.ts");
 let supabase, serviceKey;
 const runId = process.env.GITHUB_RUN_ID ? `${process.env.GITHUB_RUN_ID}-${process.env.GITHUB_RUN_ATTEMPT ?? "1"}` : randomUUID();
 async function jsonFetch(url, options = {}) {
@@ -36,7 +36,7 @@ try {
     if (months.has(key)) throw new Error("SYNC_FAILED"); months.add(key);
     if (source.store==="816" && source.enabled && (source.year!==2026 || source.month!==10 || source.range!=="AD1:AK2000" || source.tab!=="39期目816　出納帳" || !Number.isInteger(source.sheetId) || JSON.stringify(source.yearCell)!=="[3,0]" || JSON.stringify(source.monthCell)!=="[5,0]" || source.labelsRow!==4 || source.headerRows!==4 || source.openingValueRow!==6 || source.firstTransactionDate!=="2026-10-01")) throw new Error("SYNC_FAILED");
   }
-  if (config.sales.range!=="A1:AC400") throw new Error("SYNC_FAILED");
+  if(config.sales.format!=="fiscal-year-vertical"||config.sales.range!=="L1:V400"||config.sales.tab!=="2店舗合計 日間売上と人時売上"||!Number.isInteger(config.sales.sheetId)||!Number.isInteger(config.sales.fiscalYearStart)||config.sales.fiscalYearStart<2020||config.sales.fiscalYearStart>2100||config.sales.firstDataRow!==3||!Number.isInteger(config.sales.lastDataRow)||config.sales.lastDataRow<367||config.sales.lastDataRow>400)throw new Error("SYNC_FAILED");
   const dryRun = process.argv.includes("--dry-run");
   if (!dryRun) {
     supabase = process.env.SUPABASE_SYNC_URL;
@@ -50,7 +50,7 @@ try {
   const assertion = `${unsigned}.${signer.sign(account.private_key,"base64url")}`;
   const token = await jsonFetch("https://oauth2.googleapis.com/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion }) });
   if (typeof token?.access_token !== "string") throw new Error("SYNC_FAILED");
-  const read = async source => {
+  const sourceRange = async source => {
     const headers={Authorization:`Bearer ${token.access_token}`};
     const metadata=await jsonFetch(`https://sheets.googleapis.com/v4/spreadsheets/${source.spreadsheetId}?fields=sheets(properties(sheetId,title,gridProperties))`,{headers});
     const sheet=metadata.sheets?.find(s=>s.properties?.title===source.tab)?.properties;
@@ -59,13 +59,35 @@ try {
     const bound=Math.min(requested,sheet.gridProperties.rowCount);
     const boundedRange=source.range.replace(/\d+$/,String(bound));
     const range = `'${source.tab.replaceAll("'", "''")}'!${boundedRange}`;
-    const result = await jsonFetch(`https://sheets.googleapis.com/v4/spreadsheets/${source.spreadsheetId}/values/${encodeURIComponent(range)}?valueRenderOption=FORMATTED_VALUE`,{headers});
-    const grid=result.values;
-    if (!Array.isArray(grid) || grid.length>=bound) throw new Error("SOURCE_VALIDATION_FAILED");
-    return grid;
+    return {headers,range,bound};
+  };
+  const read=async source=>{
+    const {headers,range,bound}=await sourceRange(source);
+    const result=await jsonFetch(`https://sheets.googleapis.com/v4/spreadsheets/${source.spreadsheetId}/values/${encodeURIComponent(range)}?valueRenderOption=FORMATTED_VALUE`,{headers});
+    if(!Array.isArray(result.values)||result.values.length>=bound)throw new Error("SOURCE_VALIDATION_FAILED");
+    return result.values;
+  };
+  const readFiscalSales=async source=>{
+    const {headers,range,bound}=await sourceRange(source);
+    if(bound<source.lastDataRow)throw new Error("SOURCE_VALIDATION_FAILED");
+    const fields="sheets(properties(sheetId),data(startRow,startColumn,rowData(values(formattedValue,effectiveValue))))";
+    const result=await jsonFetch(`https://sheets.googleapis.com/v4/spreadsheets/${source.spreadsheetId}?ranges=${encodeURIComponent(range)}&includeGridData=true&fields=${encodeURIComponent(fields)}`,{headers});
+    const data=result.sheets?.find(s=>s.properties?.sheetId===source.sheetId)?.data;
+    if(!Array.isArray(data)||data.length!==1||(data[0].startRow??0)!==0||data[0].startColumn!==11||!Array.isArray(data[0].rowData))throw new Error("SOURCE_VALIDATION_FAILED");
+    const formatted=data[0].rowData.map(r=>(r.values??[]).map(v=>v.formattedValue??""));
+    const effective=data[0].rowData.map(r=>(r.values??[]).map(v=>{
+      const value=v.effectiveValue;
+      if(!value)return null;
+      if(typeof value.numberValue==="number")return value.numberValue;
+      if(typeof value.stringValue==="string")return value.stringValue;
+      if(typeof value.boolValue==="boolean")return value.boolValue;
+      return "#ERROR!";
+    }));
+    return {formatted,effective};
   };
   const today = new Intl.DateTimeFormat("en-CA", { timeZone:"Asia/Tokyo",year:"numeric",month:"2-digit",day:"2-digit" }).format(new Date());
-  const sales=parseSalesGrid(await read(config.sales),config.sales.blocks,today);
+  const grid=await readFiscalSales(config.sales);
+  const sales=parseFiscalSalesGrid(grid.formatted,grid.effective,config.sales,today);
   if (!dryRun) await rpc("portal_apply_sales_sync",{p_run_id:runId,p_sales:sales});
   let failed=false, pending=false;
   for (const source of config.cashSources) {

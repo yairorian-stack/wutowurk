@@ -84,3 +84,16 @@ describe("店舗・月別出納帳の原本照合と公開",()=>{
     await asUser(0,async()=>{await db.query("select portal_accept_email_invitation()");await expect(apply("forged","816","2026-10-01")).rejects.toThrow();});
   });
 });
+
+describe("通期解析結果の日次upsert",()=>{
+  it("10/25以降を再取込しても過去・出納帳が消えず、店舗日が重複しない",async()=>{
+    const {fiscalFixture,fiscalConfig}=await import("../fixtures/fiscal-sales");
+    const {parseFiscalSalesGrid}=await import("../../src/lib/sheets-import");
+    const fixture=fiscalFixture({"2026-10-25":{honten:100},"2026-10-26":{honten:200,hanoura:300},"2026-10-27":{hanoura:400}});
+    const rows=parseFiscalSalesGrid(fixture.formatted,fixture.effective,fiscalConfig,"2026-10-28");
+    for(const run of ["fiscal-one","fiscal-one","fiscal-two"])await db.query("select portal_apply_sales_sync($1,$2)",[run,JSON.stringify(rows)]);
+    expect((await db.query("select * from portal_sales_records")).rows).toHaveLength(6);
+    expect((await db.query("select * from portal_sales_records where sales_date='2026-10-01'")).rows).toHaveLength(2);
+    expect((await db.query("select * from portal_cash_records where active")).rows).toHaveLength(2);
+  });
+});

@@ -1,0 +1,42 @@
+{
+  "sales": {
+    "spreadsheetId": "REPLACE_WITH_PRIVATE_SALES_SPREADSHEET_ID",
+    "tab": "2店舗合計 日間売上と人時売上",
+    "sheetId": 0,
+    "format": "fiscal-year-vertical",
+    "range": "L1:V400",
+    "fiscalYearStart": 2026,
+    "firstDataRow": 3,
+    "lastDataRow": 368
+  },
+  "cashSources": [
+    {
+      "spreadsheetId": "REPLACE_WITH_PRIVATE_HONTEN_CASH_SPREADSHEET_ID",
+      "tab": "38期目　出納帳",
+      "range": "EF1:EN2000",
+      "store": "honten",
+      "year": 2026,
+      "month": 10,
+      "sourceId": "honten-2026-10",
+      "headerRows": 4,
+      "enabled": false
+    },
+    {
+      "spreadsheetId": "REPLACE_WITH_PRIVATE_HANOURA_CASH_SPREADSHEET_ID",
+      "tab": "39期目816　出納帳",
+      "sheetId": 0,
+      "range": "AD1:AK2000",
+      "store": "816",
+      "year": 2026,
+      "month": 10,
+      "sourceId": "hanoura-2026-10",
+      "headerRows": 4,
+      "yearCell": [3, 0],
+      "monthCell": [5, 0],
+      "labelsRow": 4,
+      "openingValueRow": 6,
+      "firstTransactionDate": "2026-10-01",
+      "enabled": false
+    }
+  ]
+}
