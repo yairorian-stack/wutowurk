@@ -156,13 +156,25 @@ http
     }
     if (url.pathname === "/rest/v1/portal_sync_runs") return reply(response,200,
       {attempted_at:"2026-10-28T01:00:00Z",last_success_at:"2026-10-27T21:00:00Z",status:profile.email.includes("failed") ? "failed" : "warning"});
-    if (url.pathname === "/rest/v1/portal_cash_months") return reply(response,200,
-      admin || profile.store_id==="honten" ? {month:"2026-10-01",opening_jpy:1000} : null);
-    if (url.pathname === "/rest/v1/portal_cash_records") return reply(response,200,
-      admin || profile.store_id==="honten" ? [
-        {transaction_date:"2026-10-01",source_order:5,category:"売上",description:"架空の出納帳明細",receipt_jpy:1500,payment_jpy:0,balance_jpy:2500},
-        {transaction_date:"2026-10-01",source_order:6,category:"クレジット",description:"架空の控除",receipt_jpy:0,payment_jpy:500,balance_jpy:2000},
-      ] : []);
+    const financeScope = row=>admin || (profile.role==="manager" && row.store_id===profile.store_id);
+    if (url.pathname === "/rest/v1/portal_cash_months") return reply(response,200,[
+      {store_id:"honten",month:"2026-10-01",opening_jpy:1000},
+      {store_id:"816",month:"2026-10-01",opening_jpy:500},
+    ].filter(financeScope));
+    if (url.pathname === "/rest/v1/portal_cash_sync_status") return reply(response,200,[
+      {store_id:"honten",month:"2026-10-01",status:"success",message_code:"SYNC_OK",last_success_at:"2026-10-27T21:00:00Z"},
+      {store_id:"816",month:"2026-10-01",status:profile.email.includes("mismatch")?"failed":"success",message_code:profile.email.includes("mismatch")?"SALES_MISMATCH":"SYNC_OK",last_success_at:"2026-10-27T21:00:00Z"},
+      ...["2026-08-01","2026-09-01"].map(month=>({store_id:"816",month,status:"blocked",message_code:"SOURCE_REVIEW_PENDING",last_success_at:null})),
+    ].filter(financeScope));
+    if (url.pathname === "/rest/v1/portal_cash_records") {
+      const store=url.searchParams.get("store_id")?.replace(/^eq\./,"");
+      const rows=[
+        {store_id:"honten",transaction_date:"2026-10-01",source_order:5,category:"売上",description:"架空の出納帳明細",receipt_jpy:1500,payment_jpy:0,balance_jpy:2500},
+        {store_id:"honten",transaction_date:"2026-10-01",source_order:6,category:"クレジット",description:"架空の控除",receipt_jpy:0,payment_jpy:500,balance_jpy:2000},
+        {store_id:"816",transaction_date:"2026-10-01",source_order:6,category:"売上",description:"架空の羽ノ浦明細",receipt_jpy:1000,payment_jpy:0,balance_jpy:1500},
+      ];
+      return reply(response,200,rows.filter(r=>financeScope(r)&&r.store_id===store));
+    }
     if (url.pathname === "/rest/v1/portal_sales_imports") return reply(response, 200,
       admin || profile.role === "manager" ? { id: "fixture", source: "架空の共有実績テスト", as_of: "2026-10-02" } : null);
     if (url.pathname === "/rest/v1/portal_sales_daily") {

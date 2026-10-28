@@ -10,17 +10,25 @@ export async function readSharedSales(member: Member): Promise<SharedSalesState>
     const canonical = await client.from("portal_sales_records").select("store_id,sales_date,sales_jpy,reported_yoy").order("sales_date").limit(3001);
     if (!canonical.error) {
       const details: SharedFinanceDetails = {};
-      const [latest, success, month] = await Promise.all([
+      const [latest, success, months, statuses] = await Promise.all([
         client.from("portal_sync_runs").select("attempted_at,last_success_at,status").order("attempted_at", { ascending: false }).limit(1).maybeSingle(),
         client.from("portal_sync_runs").select("last_success_at").not("last_success_at","is",null).order("last_success_at", { ascending: false }).limit(1).maybeSingle(),
-        client.from("portal_cash_months").select("month,opening_jpy").order("month", { ascending: false }).limit(1).maybeSingle(),
+        client.from("portal_cash_months").select("store_id,month,opening_jpy").order("month", { ascending: false }).limit(25),
+        client.from("portal_cash_sync_status").select("store_id,month,status,message_code,last_success_at").order("month",{ascending:false}).limit(50),
       ]);
       if (latest.data) details.sync = { ...latest.data, last_success_at: success.data?.last_success_at ?? null };
-      if (month.data && !month.error) {
-        const cash = await client.from("portal_cash_records").select("transaction_date,source_order,category,description,receipt_jpy,payment_jpy,balance_jpy")
-          .eq("store_id","honten").eq("active",true).gte("transaction_date",month.data.month).lt("transaction_date",nextMonth(month.data.month)).order("source_order").limit(5001);
-        try { if (cash.error) throw new Error(); details.cash = sharedCashFromRows(month.data,cash.data); } catch { details.cashUnavailable = true; }
-      } else if (month.error) details.cashUnavailable = true;
+      if (!statuses.error && statuses.data) details.cashStatuses=statuses.data;
+      else if (statuses.error?.code!=="PGRST205") details.cashUnavailable=true;
+      details.cashMonths=[];
+      if (!months.error && months.data && months.data.length<25) {
+        const results=await Promise.all(months.data.map(async month=>{
+          const cash=await client.from("portal_cash_records").select("transaction_date,source_order,category,description,receipt_jpy,payment_jpy,balance_jpy")
+            .eq("store_id",month.store_id).eq("active",true).gte("transaction_date",month.month).lt("transaction_date",nextMonth(month.month)).order("source_order").limit(5001);
+          if(cash.error) throw new Error();
+          return {...sharedCashFromRows(month,cash.data),store_id:month.store_id as "honten"|"816"};
+        }).map(p=>p.then(data=>({data}),()=>({data:null}))));
+        for(const result of results) if(result.data) details.cashMonths.push(result.data);else details.cashUnavailable=true;
+      } else if(months.error || (months.data && months.data.length>=25)) details.cashUnavailable=true;
       if (canonical.data?.length) return { status: "ready", data: canonicalSalesFromRows(canonical.data), ...details };
       return { status: "pending", ...details };
     }

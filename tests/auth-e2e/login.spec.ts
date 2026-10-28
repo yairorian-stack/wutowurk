@@ -218,7 +218,7 @@ test("許可ユーザーの実績確認画面は共有売上を表示し、未�
   await page.goto("/daily");
   await expect(page.getByRole("heading", { name: "実績売上の集計" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "現金出納帳", exact: true })).toBeVisible();
-  await expect(page.getByText("本店出納帳は取込準備中です。", { exact: false })).toBeVisible();
+  await expect(page.getByText("選択店舗の出納帳は取込準備中、または原本確認待ちです。", { exact: false })).toBeVisible();
   await page.getByLabel("表示する店舗", { exact: true }).selectOption("all");
   await expect(page.getByTestId("imported-sales-total")).toContainText("2,500");
   await expect(page.getByRole("rowheader", { name: "10/01（木）", exact: true })).toBeVisible();
@@ -240,9 +240,11 @@ test("日次取込の実績と本店出納帳・更新警告を権限内で表�
   await page.goto("/daily");
   await page.getByLabel("表示する店舗",{exact:true}).selectOption("all");
   await expect(page.getByLabel("自動取込の状況")).toContainText("取込成功");
-  await expect(page.getByText("羽ノ浦店の出納帳は原本の年度確認待ちです。",{exact:false})).toBeVisible();
-  const cash=page.getByRole("table",{name:"本店現金出納帳（原本照合済み）"});
+  await expect(page.getByText("羽ノ浦店・2026-08：原本の月・残高確認待ち",{exact:false})).toBeVisible();
+  const cash=page.getByRole("table",{name:/本店現金出納帳・2026-10/});
   await expect(cash.getByText("架空の出納帳明細")).toBeVisible();
+  await expect(page.getByRole("table",{name:/羽ノ浦店現金出納帳・2026-10/}).getByText("架空の羽ノ浦明細")).toBeVisible();
+  await expect(page.getByText("羽ノ浦店・2026-09：原本の月・残高確認待ち",{exact:false})).toBeVisible();
   await expect(cash.getByRole("row").last()).toContainText("2,000");
   if(info.project.name==="mobile"){
     await page.setViewportSize({width:320,height:900});
@@ -257,7 +259,19 @@ test("失敗時は前回の正常値を表示し、他店管理者へ本店出�
   await expect(page.getByText("架空の出納帳明細")).toBeVisible();
   await page.request.post("/api/auth/logout",{headers:{origin:"http://127.0.0.1:3100"}});
   await login(page,`manager-other-sync-${info.project.name}@example.invalid`);await expect(page).toHaveURL("http://127.0.0.1:3100/");await page.goto("/daily");
-  await expect(page.getByText("羽ノ浦店の出納帳は原本の年度確認待ちです。",{exact:false})).toBeVisible();
+  await expect(page.getByText("羽ノ浦店・2026-08：原本の月・残高確認待ち",{exact:false})).toBeVisible();
   await expect(page.getByText("架空の出納帳明細")).toHaveCount(0);
   expect(await page.content()).not.toContain("架空の出納帳明細");
+});
+
+test("月別不一致でも前回の羽ノ浦10月を維持し、本店管理者へ渡さない",async({page},info)=>{
+  await login(page,`owner-syncmismatch-${info.project.name}@example.invalid`);await expect(page).toHaveURL("http://127.0.0.1:3100/");await page.goto("/daily");
+  await page.getByLabel("表示する店舗",{exact:true}).selectOption("all");
+  await expect(page.getByText("羽ノ浦店・2026-10：営業日報の売上と不一致。",{exact:false})).toContainText("前回の正常値");
+  await expect(page.getByText("架空の羽ノ浦明細")).toBeVisible();
+  await page.request.post("/api/auth/logout",{headers:{origin:"http://127.0.0.1:3100"}});
+  await login(page,`manager-sync-${info.project.name}@example.invalid`);await expect(page).toHaveURL("http://127.0.0.1:3100/");await page.goto("/daily");
+  await expect(page.getByText("架空の出納帳明細")).toBeVisible();
+  expect(await page.content()).not.toContain("架空の羽ノ浦明細");
+  await expect(page.getByText("羽ノ浦店・2026-08",{exact:false})).toHaveCount(0);
 });

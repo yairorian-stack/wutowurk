@@ -1,6 +1,6 @@
 // Pure parsing only. No network, credentials or real source data belong here.
 export type SyncSale = { store_id: "honten" | "816"; sales_date: string; sales_jpy: number; labor_minutes: number | null };
-export type SyncCash = { store_id: "honten"; transaction_date: string; source_key: string; source_order: number; category: string; description: string; receipt_jpy: number; payment_jpy: number; balance_jpy: number };
+export type SyncCash = { store_id: "honten" | "816"; transaction_date: string; source_key: string; source_order: number; category: string; description: string; receipt_jpy: number; payment_jpy: number; balance_jpy: number };
 export type SalesBlock = { store: "honten" | "816"; column: number; year: number; months: number[] };
 const weekdays = "日月火水木金土";
 function fail(): never { throw new Error("SOURCE_VALIDATION_FAILED"); }
@@ -58,11 +58,23 @@ export function parseSalesGrid(grid: unknown[][], blocks: SalesBlock[], asOf: st
   if (!rows.length) return fail();
   return rows;
 }
-export type CashBlock = { year: number; month: number; firstRow: number; source: string; headerRows: number };
+export type CashBlock = { store?: "honten" | "816"; year: number; month: number; firstRow: number; source: string; headerRows: number;
+  yearCell?: [number, number]; monthCell?: [number, number]; labelsRow?: number };
+
 export function parseCashGrid(grid: unknown[][], block: CashBlock, asOf: string): { opening: number; rows: SyncCash[] } {
+  const store = block.store ?? "honten";
+  if (!["honten","816"].includes(store)) return fail();
   const header = grid.slice(0, block.headerRows).flat().map(cell).join(" ");
   if (!Number.isInteger(block.year) || block.year < 2026 || block.year > 2100 || block.month < 1 || block.month > 12 || block.headerRows < 1 || block.firstRow < 1 || !/^[a-zA-Z0-9:_-]{1,160}$/.test(block.source)) return fail();
-  if (!header.includes(String(block.year)) || !header.includes(`${block.month}月`) || !header.includes("本店") || !["科目", "概要", "入金額", "出金額", "残高"].every(v => header.includes(v))) return fail();
+  if (block.yearCell || block.monthCell || block.labelsRow) {
+    if (!block.yearCell || !block.monthCell || !block.labelsRow) return fail();
+    const [yr,yc]=block.yearCell, [mr,mc]=block.monthCell;
+    if (yr<1 || mr<1 || yc<0 || mc<0 || block.labelsRow<1 || block.labelsRow>block.headerRows) return fail();
+    // The explicitly reviewed year/month cells take precedence over an obsolete title year.
+    if (cell(grid[yr-1]?.[yc]) !== String(block.year) || cell(grid[mr-1]?.[mc]).replace(/月$/, "") !== String(block.month)) return fail();
+    const labels=["月","日","曜","科目","概要","入金額","出金額","残高"];
+    if (!labels.every((v,i)=>cell(grid[block.labelsRow!-1]?.[i])===v)) return fail();
+  } else if (!header.includes(String(block.year)) || !header.includes(`${block.month}月`) || !header.includes(store === "honten" ? "本店" : "816") || !["科目", "概要", "入金額", "出金額", "残高"].every(v => header.includes(v))) return fail();
   // Nine-column month range: month/day/weekday/category/description/in/out/balance/(spacer).
   const rows: SyncCash[] = [];
   let date = "", opening: number | null = null, balance: number | null = null;
@@ -79,6 +91,8 @@ export function parseCashGrid(grid: unknown[][], block: CashBlock, asOf: string)
       if (reported !== null && reported !== balance) return fail();
       continue;
     }
+    // A reviewed month-marker row is metadata, not a dated transaction or inferred opening.
+    if (block.monthCell?.[0] === i+1 && !cell(raw[1]) && !category && !description && receipt === null && payment === null && reported === null) continue;
     if (cell(raw[0]) || cell(raw[1])) {
       if (!cell(raw[1])) return fail();
       const m = cell(raw[0]) ? Number(cell(raw[0]).replace(/月$/, "")) : block.month;
@@ -94,8 +108,18 @@ export function parseCashGrid(grid: unknown[][], block: CashBlock, asOf: string)
     if (rows.length && date < rows[rows.length - 1].transaction_date) return fail();
     balance += (receipt ?? 0) - (payment ?? 0);
     if (balance !== reported || category.length > 100 || description.length > 500) return fail();
-    rows.push({ store_id: "honten", transaction_date: date, source_key: `${block.source}:${block.firstRow + i}`, source_order: block.firstRow + i, category, description, receipt_jpy: receipt ?? 0, payment_jpy: payment ?? 0, balance_jpy: reported });
+    rows.push({ store_id: store, transaction_date: date, source_key: `${block.source}:${block.firstRow + i}`, source_order: block.firstRow + i, category, description, receipt_jpy: receipt ?? 0, payment_jpy: payment ?? 0, balance_jpy: reported });
   }
   if (opening === null || !rows.length) return fail();
   return { opening, rows };
+}
+
+export function crossCheckCashSales(rows: SyncCash[], sales: SyncSale[]) {
+  const reported = new Map(sales.map(r=>[`${r.store_id}/${r.sales_date}`,r.sales_jpy]));
+  const daily = new Map<string,number>();
+  for (const row of rows) {
+    const key=`${row.store_id}/${row.transaction_date}`;
+    daily.set(key,(daily.get(key)??0)+(row.category === "売上" ? row.receipt_jpy-row.payment_jpy : 0));
+  }
+  for (const [key,total] of daily) if (reported.get(key)!==total) throw new Error("SALES_MISMATCH");
 }
