@@ -218,7 +218,7 @@ test("許可ユーザーの実績確認画面は共有売上を表示し、未�
   await page.goto("/daily");
   await expect(page.getByRole("heading", { name: "実績売上の集計" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "現金出納帳", exact: true })).toBeVisible();
-  await expect(page.getByText("明細未提供・残高未照合", { exact: true })).toBeVisible();
+  await expect(page.getByText("本店出納帳は取込準備中です。", { exact: false })).toBeVisible();
   await page.getByLabel("表示する店舗", { exact: true }).selectOption("all");
   await expect(page.getByTestId("imported-sales-total")).toContainText("2,500");
   await expect(page.getByRole("rowheader", { name: "10/01（木）", exact: true })).toBeVisible();
@@ -232,4 +232,32 @@ test("許可ユーザーの実績確認画面は共有売上を表示し、未�
   await expect(page.getByText("元の集計結果は、まだポータルへ反映されていません。", { exact: true })).toHaveCount(0);
   await expect(page.getByLabel("売上ファイルを読み込む（JSON）")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "サンプルで操作を試す" })).toHaveCount(0);
+});
+
+test("日次取込の実績と本店出納帳・更新警告を権限内で表示する",async({page},info)=>{
+  const anon=await page.request.get("/daily");expect(await anon.text()).not.toContain("架空の出納帳明細");
+  await login(page,`owner-sync-${info.project.name}@example.invalid`);await expect(page).toHaveURL("http://127.0.0.1:3100/");
+  await page.goto("/daily");
+  await page.getByLabel("表示する店舗",{exact:true}).selectOption("all");
+  await expect(page.getByLabel("自動取込の状況")).toContainText("取込成功");
+  await expect(page.getByText("羽ノ浦店の出納帳は原本の年度確認待ちです。",{exact:false})).toBeVisible();
+  const cash=page.getByRole("table",{name:"本店現金出納帳（原本照合済み）"});
+  await expect(cash.getByText("架空の出納帳明細")).toBeVisible();
+  await expect(cash.getByRole("row").last()).toContainText("2,000");
+  if(info.project.name==="mobile"){
+    await page.setViewportSize({width:320,height:900});
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  }
+  await page.getByLabel("表示する店舗",{exact:true}).selectOption("816");
+  await expect(cash).toHaveCount(0);
+});
+test("失敗時は前回の正常値を表示し、他店管理者へ本店出納帳を渡さない",async({page},info)=>{
+  await login(page,`owner-syncfailed-${info.project.name}@example.invalid`);await expect(page).toHaveURL("http://127.0.0.1:3100/");await page.goto("/daily");
+  await expect(page.getByLabel("自動取込の状況")).toContainText("取込失敗");
+  await expect(page.getByText("架空の出納帳明細")).toBeVisible();
+  await page.request.post("/api/auth/logout",{headers:{origin:"http://127.0.0.1:3100"}});
+  await login(page,`manager-other-sync-${info.project.name}@example.invalid`);await expect(page).toHaveURL("http://127.0.0.1:3100/");await page.goto("/daily");
+  await expect(page.getByText("羽ノ浦店の出納帳は原本の年度確認待ちです。",{exact:false})).toBeVisible();
+  await expect(page.getByText("架空の出納帳明細")).toHaveCount(0);
+  expect(await page.content()).not.toContain("架空の出納帳明細");
 });

@@ -12,7 +12,7 @@ async function asUser(index: number, fn: () => Promise<void>, method = "oauth", 
 }
 beforeAll(async () => {
   db = new PGlite(); await db.waitReady;
-  await db.exec(`create role anon;create role authenticated;create schema auth;
+  await db.exec(`create role anon;create role authenticated;create role service_role;create schema auth;
     grant usage on schema auth to authenticated,anon;
     create table auth.users(id uuid primary key,email text,email_confirmed_at timestamptz);
     create table auth.identities(user_id uuid,provider text,identity_data jsonb);
@@ -27,11 +27,14 @@ beforeAll(async () => {
     if (i !== 2) await db.query("insert into portal_google_invitations(email,display_name,job_title,role,store_id) values($1,'架空 スタッフ','社員',$2,$3)", [email, i === 0 ? "company" : "manager", i === 0 ? null : "honten"]);
   }
   await db.exec("insert into portal_sales_imports(id,source,as_of) values('fixture','架空のRLS検証','2026-10-02');insert into portal_sales_daily values('fixture','honten','2026-10-01',1500,1500,110),('fixture','816','2026-10-01',600,600,90)");
+  await db.exec(readFileSync("supabase/migrations/202610280001_sheets_sync.sql", "utf8"));
+  await db.exec("insert into portal_cash_months values('honten','2026-10-01',1000,now());insert into portal_cash_records(store_id,source_key,transaction_date,source_order,category,description,receipt_jpy,payment_jpy,balance_jpy) values('honten','fixture:1','2026-10-01',1,'売上','架空',100,0,1100)");
+
 }, 30000);
 afterAll(async () => { await db?.close(); });
 describe("共有売上の認証・店舗別RLS", () => {
   it("未認証は売上・取込情報とも読めない", async () => {
-    for (const table of ["portal_sales_imports","portal_sales_daily"]) {
+    for (const table of ["portal_sales_imports","portal_sales_daily","portal_sales_records","portal_cash_records","portal_sync_runs","portal_sync_audit"]) {
       await db.exec("begin;set local role anon");
       try { await expect(db.query(`select * from ${table}`)).rejects.toThrow(); } finally { await db.exec("rollback"); }
     }
@@ -71,5 +74,40 @@ describe("共有売上の認証・店舗別RLS", () => {
   it("全社管理者でも画面の認証キーから実績を書き換えたり削除したりできない", async () => {
     for (const query of ["delete from portal_sales_daily", "update portal_sales_daily set sales_jpy=0", "insert into portal_sales_imports(id,source,as_of) values('fake','架空','2026-10-02')"])
       await asUser(0, async () => { await db.query("select portal_accept_email_invitation()"); await expect(db.query(query)).rejects.toThrow(); }, "otp");
+  });
+});
+
+describe("日次取込の重複防止とトランザクション",()=>{
+  const sale=[{store_id:"honten",sales_date:"2026-10-02",sales_jpy:1600,labor_minutes:120}];
+  const cash=[{store_id:"honten",source_key:"fixture:1",transaction_date:"2026-10-01",source_order:1,category:"売上",description:"架空",receipt_jpy:100,payment_jpy:0,balance_jpy:1100}];
+  async function apply(id:string, s= sale,c=cash){await db.query("select portal_apply_sheets_sync($1,$2,$3,'2026-10-01',1000)",[id,JSON.stringify(s),JSON.stringify(c)]);}
+  it("一日分のupsertで過去が消えず、再実行しても重複しない",async()=>{
+    await apply("run-one"); await apply("run-one"); await apply("run-two");
+    expect((await db.query("select * from portal_sales_records")).rows).toHaveLength(3);
+    expect((await db.query("select * from portal_cash_records where active")).rows).toHaveLength(1);
+    expect((await db.query("select * from portal_sync_audit")).rows).toHaveLength(2);
+  });
+  it("不正残高・重複・異常な訂正で全体をロールバックし、正常値を維持する",async()=>{
+    await expect(apply("bad-balance",[{...sale[0],sales_jpy:1700}],[{...cash[0],balance_jpy:1101}])).rejects.toThrow();
+    await expect(apply("bad-duplicate",[...sale,...sale])).rejects.toThrow();
+    await expect(apply("bad-correction",[{...sale[0],sales_jpy:99999999}])).rejects.toThrow();
+    expect((await db.query<{sales_jpy:number}>("select sales_jpy from portal_sales_records where sales_date='2026-10-02'")).rows[0].sales_jpy).toBe(1600);
+  });
+  it("OTP本人でも画面経由の書込RPC実行・監査原本取得は禁止",async()=>{
+    await asUser(0,async()=>{
+      await db.query("select portal_accept_email_invitation()");
+      await expect(apply("forged")).rejects.toThrow();
+      await expect(db.query("select * from portal_sync_audit")).rejects.toThrow();
+    },"otp");
+  });
+  it("新しい売上・出納帳にも所属店・許可取り消しのRLSを適用",async()=>{
+    await asUser(1,async()=>{
+      await db.query("select portal_accept_email_invitation()");
+      expect((await db.query("select * from portal_sales_records where store_id='816'")).rows).toHaveLength(0);
+      expect((await db.query("select * from portal_cash_records")).rows).toHaveLength(1);
+      await db.exec("reset role;update portal_google_invitations set enabled=false;set local role authenticated");
+      expect((await db.query("select * from portal_cash_records")).rows).toHaveLength(0);
+      expect((await db.query("select * from portal_sales_records")).rows).toHaveLength(0);
+    },"otp");
   });
 });

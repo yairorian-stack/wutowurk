@@ -146,6 +146,23 @@ http
     const admin =
       profile.status === "approved" &&
       ["company", "system"].includes(profile.role);
+    if (url.pathname === "/rest/v1/portal_sales_records") {
+      if (!profile.email.includes("-sync")) return reply(response,404,{code:"PGRST205"});
+      const rows = [
+        {store_id:"honten",sales_date:"2026-10-01",sales_jpy:1500,reported_yoy:null},
+        {store_id:"816",sales_date:"2026-10-01",sales_jpy:1000,reported_yoy:null},
+      ];
+      return reply(response,200,rows.filter(r=>admin || (profile.role==="manager" && r.store_id===profile.store_id)));
+    }
+    if (url.pathname === "/rest/v1/portal_sync_runs") return reply(response,200,
+      {attempted_at:"2026-10-28T01:00:00Z",last_success_at:"2026-10-27T21:00:00Z",status:profile.email.includes("failed") ? "failed" : "warning"});
+    if (url.pathname === "/rest/v1/portal_cash_months") return reply(response,200,
+      admin || profile.store_id==="honten" ? {month:"2026-10-01",opening_jpy:1000} : null);
+    if (url.pathname === "/rest/v1/portal_cash_records") return reply(response,200,
+      admin || profile.store_id==="honten" ? [
+        {transaction_date:"2026-10-01",source_order:5,category:"売上",description:"架空の出納帳明細",receipt_jpy:1500,payment_jpy:0,balance_jpy:2500},
+        {transaction_date:"2026-10-01",source_order:6,category:"クレジット",description:"架空の控除",receipt_jpy:0,payment_jpy:500,balance_jpy:2000},
+      ] : []);
     if (url.pathname === "/rest/v1/portal_sales_imports") return reply(response, 200,
       admin || profile.role === "manager" ? { id: "fixture", source: "架空の共有実績テスト", as_of: "2026-10-02" } : null);
     if (url.pathname === "/rest/v1/portal_sales_daily") {

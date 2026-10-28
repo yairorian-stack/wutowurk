@@ -25,3 +25,26 @@ describe("共有売上の表示モデル", () => {
     expect(() => sharedSalesFromRows(header, [{ ...rows[0], sales_date: "2026-09-31" }])).toThrow();
   });
 });
+
+import { canonicalSalesFromRows, sharedCashFromRows } from "../../src/lib/shared-sales";
+describe("日次更新用の表示モデル",()=>{
+  it("店舗日をまとめて月累計を計算し、月替わりでリセットする",()=>{
+    const data=canonicalSalesFromRows([
+      {store_id:"honten",sales_date:"2026-10-31",sales_jpy:1500,reported_yoy:null},
+      {store_id:"honten",sales_date:"2026-11-01",sales_jpy:600,reported_yoy:null},
+    ]);
+    expect(data.rows.map(r=>r.honten.cumulative)).toEqual([1500,600]);
+    expect(data.rows[0]["816"].sales).toBeNull();
+  });
+  it("同じ店舗日の重複を合算せず拒否する",()=>{
+    const row={store_id:"honten",sales_date:"2026-10-01",sales_jpy:1500,reported_yoy:null};
+    expect(()=>canonicalSalesFromRows([row,row])).toThrow("重複");
+  });
+  it("出納帳の残高と順序が不正なら表示モデルを作らない",()=>{
+    const header={month:"2026-10-01",opening_jpy:1000};
+    const row={transaction_date:"2026-10-01",source_order:5,category:"売上",description:"架空",receipt_jpy:1500,payment_jpy:0,balance_jpy:2500};
+    expect(sharedCashFromRows(header,[row]).rows).toHaveLength(1);
+    expect(()=>sharedCashFromRows(header,[{...row,balance_jpy:2501}])).toThrow("残高");
+    expect(()=>sharedCashFromRows(header,[row,row])).toThrow();
+  });
+});
