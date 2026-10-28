@@ -34,7 +34,7 @@ export async function readSharedSales(
       .limit(3001);
     if (!canonical.error) {
       const details: SharedFinanceDetails = {};
-      const [latest, success, months, statuses, reportsResult, expensesResult] =
+      const [latest, success, months, statuses, reportsWithLabels, expensesResult] =
         await Promise.all([
           client
             .from("portal_sync_runs")
@@ -62,7 +62,7 @@ export async function readSharedSales(
           client
             .from("portal_manager_daily_reports")
             .select(
-              "store_id,report_date,sales_jpy,cash_sales_jpy,credit_sales_jpy,qr_sales_jpy,gift_certificate_jpy,other_cashless_jpy,labor_minutes,voucher_count,voucher_discount_jpy,memo,revision,updated_at",
+              "store_id,report_date,sales_jpy,cash_sales_jpy,cash_sales_label,credit_sales_jpy,credit_sales_label,qr_sales_jpy,qr_sales_label,gift_certificate_jpy,gift_certificate_label,other_cashless_jpy,other_cashless_label,labor_minutes,voucher_count,voucher_discount_jpy,memo,revision,updated_at",
             )
             .order("report_date")
             .limit(3001),
@@ -87,15 +87,33 @@ export async function readSharedSales(
 
       let managerReports: ManagerDailyReport[] = [];
       let managerExpenses: ManagerCashExpense[] = [];
-      if (reportsResult.error || expensesResult.error) {
+      let reportRows: unknown = reportsWithLabels.data;
+      let reportError = reportsWithLabels.error;
+      let labelsReady = true;
+      if (
+        reportError &&
+        ["42703", "PGRST204"].includes(reportError.code)
+      ) {
+        const fallback = await client
+          .from("portal_manager_daily_reports")
+          .select(
+            "store_id,report_date,sales_jpy,cash_sales_jpy,credit_sales_jpy,qr_sales_jpy,gift_certificate_jpy,other_cashless_jpy,labor_minutes,voucher_count,voucher_discount_jpy,memo,revision,updated_at",
+          )
+          .order("report_date")
+          .limit(3001);
+        reportRows = fallback.data;
+        reportError = fallback.error;
+        labelsReady = false;
+      }
+      if (reportError || expensesResult.error) {
         details.managerDailyStatus =
-          reportsResult.error?.code === "PGRST205" ||
+          reportError?.code === "PGRST205" ||
           expensesResult.error?.code === "PGRST205"
             ? "setup-required"
             : "unavailable";
       } else {
         const parsedReports = managerDailyRowSchema.array().safeParse(
-          reportsResult.data,
+          reportRows,
         );
         const parsedExpenses = managerExpenseRowSchema.array().safeParse(
           expensesResult.data,
@@ -103,7 +121,7 @@ export async function readSharedSales(
         if (parsedReports.success && parsedExpenses.success) {
           managerReports = parsedReports.data;
           managerExpenses = parsedExpenses.data;
-          details.managerDailyStatus = "ready";
+          details.managerDailyStatus = labelsReady ? "ready" : "setup-required";
           details.managerReports = managerReports;
           details.managerExpenses = managerExpenses;
         } else details.managerDailyStatus = "unavailable";

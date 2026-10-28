@@ -20,10 +20,15 @@ type ExpenseDraft = {
 type FormState = {
   reportDate: string;
   cashSales: string;
+  cashSalesLabel: string;
   creditSales: string;
+  creditSalesLabel: string;
   qrSales: string;
+  qrSalesLabel: string;
   giftCertificate: string;
+  giftCertificateLabel: string;
   otherCashless: string;
+  otherCashlessLabel: string;
   laborHours: string;
   laborMinutes: string;
   voucherCount: string;
@@ -38,10 +43,15 @@ const number = (value: string) => (/^\d+$/.test(value) ? Number(value) : NaN);
 const blankForm = (date: string): FormState => ({
   reportDate: date,
   cashSales: "",
+  cashSalesLabel: "",
   creditSales: "0",
+  creditSalesLabel: "",
   qrSales: "0",
+  qrSalesLabel: "",
   giftCertificate: "0",
+  giftCertificateLabel: "",
   otherCashless: "0",
+  otherCashlessLabel: "",
   laborHours: "",
   laborMinutes: "0",
   voucherCount: "0",
@@ -57,10 +67,15 @@ function existingForm(
   return {
     reportDate: report.report_date,
     cashSales: String(report.cash_sales_jpy),
+    cashSalesLabel: report.cash_sales_label,
     creditSales: String(report.credit_sales_jpy),
+    creditSalesLabel: report.credit_sales_label,
     qrSales: String(report.qr_sales_jpy),
+    qrSalesLabel: report.qr_sales_label,
     giftCertificate: String(report.gift_certificate_jpy),
+    giftCertificateLabel: report.gift_certificate_label,
     otherCashless: String(report.other_cashless_jpy),
+    otherCashlessLabel: report.other_cashless_label,
     laborHours: String(Math.floor(report.labor_minutes / 60)),
     laborMinutes: String(report.labor_minutes % 60),
     voucherCount: String(report.voucher_count),
@@ -142,10 +157,15 @@ export function ManagerDailyEntry({
         storeId: selectedStore,
         reportDate: form.reportDate,
         cashSalesJpy: number(form.cashSales),
+        cashSalesLabel: form.cashSalesLabel,
         creditSalesJpy: number(form.creditSales),
+        creditSalesLabel: form.creditSalesLabel,
         qrSalesJpy: number(form.qrSales),
+        qrSalesLabel: form.qrSalesLabel,
         giftCertificateJpy: number(form.giftCertificate),
+        giftCertificateLabel: form.giftCertificateLabel,
         otherCashlessJpy: number(form.otherCashless),
+        otherCashlessLabel: form.otherCashlessLabel,
         laborMinutes: number(form.laborHours) * 60 + minutes,
         voucherCount: number(form.voucherCount),
         voucherDiscountJpy: number(form.voucherDiscount),
@@ -251,66 +271,69 @@ export function ManagerDailyEntry({
               <div className="manager-tender-grid">
                 {(
                   [
-                    ["cashSales", "現金売上"],
-                    ["creditSales", "クレジット"],
-                    ["qrSales", "QR・電子マネー"],
-                    ["giftCertificate", "商品券"],
-                    ["otherCashless", "その他キャッシュレス"],
+                    ["cashSales", "cashSalesLabel", "現金売上", "例：店頭現金"],
+                    [
+                      "creditSales",
+                      "creditSalesLabel",
+                      "クレジット払い",
+                      "例：VISA・JCB",
+                    ],
+                    [
+                      "qrSales",
+                      "qrSalesLabel",
+                      "QR・PayPay・電子マネー",
+                      "例：PayPay・交通系IC",
+                    ],
+                    [
+                      "giftCertificate",
+                      "giftCertificateLabel",
+                      "商品券（県食事券）",
+                      "例：徳島県食事券",
+                    ],
+                    [
+                      "otherCashless",
+                      "otherCashlessLabel",
+                      "その他キャッシュレス",
+                      "例：その他の決済名",
+                    ],
                   ] as const
-                ).map(([key, label]) => (
-                  <label key={key}>
-                    {label}（円）
-                    <input
-                      required
-                      type="number"
-                      inputMode="numeric"
-                      min={0}
-                      max={100000000}
-                      step={1}
-                      value={form[key]}
-                      onChange={(event) =>
-                        setForm({ ...form, [key]: event.target.value })
-                      }
-                    />
-                  </label>
+                ).map(([amountKey, labelKey, heading, placeholder]) => (
+                  <div className="manager-tender-item" key={amountKey}>
+                    <strong>{heading}</strong>
+                    <label>
+                      名目・内訳（任意）
+                      <input
+                        maxLength={120}
+                        placeholder={placeholder}
+                        value={form[labelKey]}
+                        onChange={(event) =>
+                          setForm({
+                            ...form,
+                            [labelKey]: event.target.value,
+                          })
+                        }
+                      />
+                    </label>
+                    <label>
+                      金額（円）
+                      <input
+                        required
+                        type="number"
+                        inputMode="numeric"
+                        min={0}
+                        max={100000000}
+                        step={1}
+                        value={form[amountKey]}
+                        onChange={(event) =>
+                          setForm({
+                            ...form,
+                            [amountKey]: event.target.value,
+                          })
+                        }
+                      />
+                    </label>
+                  </div>
                 ))}
-              </div>
-            </fieldset>
-            <fieldset className="labor-input">
-              <legend>本日の店舗総労働時間（全員合計・休憩を除く）</legend>
-              <div>
-                <label>
-                  <input
-                    aria-label="本日の店舗総労働時間の時間"
-                    required
-                    type="number"
-                    inputMode="numeric"
-                    min={0}
-                    max={10000}
-                    step={1}
-                    value={form.laborHours}
-                    onChange={(event) =>
-                      setForm({ ...form, laborHours: event.target.value })
-                    }
-                  />
-                  時間
-                </label>
-                <label>
-                  <input
-                    aria-label="本日の店舗総労働時間の分"
-                    required
-                    type="number"
-                    inputMode="numeric"
-                    min={0}
-                    max={59}
-                    step={1}
-                    value={form.laborMinutes}
-                    onChange={(event) =>
-                      setForm({ ...form, laborMinutes: event.target.value })
-                    }
-                  />
-                  分
-                </label>
               </div>
             </fieldset>
             <fieldset>
@@ -448,6 +471,43 @@ export function ManagerDailyEntry({
                 }
               />
             </label>
+            <fieldset className="labor-input">
+              <legend>本日の店舗総労働時間（全員合計・休憩を除く）</legend>
+              <div>
+                <label>
+                  <input
+                    aria-label="本日の店舗総労働時間の時間"
+                    required
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    max={10000}
+                    step={1}
+                    value={form.laborHours}
+                    onChange={(event) =>
+                      setForm({ ...form, laborHours: event.target.value })
+                    }
+                  />
+                  時間
+                </label>
+                <label>
+                  <input
+                    aria-label="本日の店舗総労働時間の分"
+                    required
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    max={59}
+                    step={1}
+                    value={form.laborMinutes}
+                    onChange={(event) =>
+                      setForm({ ...form, laborMinutes: event.target.value })
+                    }
+                  />
+                  分
+                </label>
+              </div>
+            </fieldset>
             {error && (
               <p className="form-error" role="alert">
                 {error}
@@ -519,14 +579,29 @@ export function ManagerDailyReportList({
                   <td>{hours(report.labor_minutes)}</td>
                   <td className="manager-tender-summary">
                     現金 {yen(report.cash_sales_jpy)}
+                    {report.cash_sales_label && (
+                      <span>・{report.cash_sales_label}</span>
+                    )}
                     <br />
                     クレジット {yen(report.credit_sales_jpy)}
+                    {report.credit_sales_label && (
+                      <span>・{report.credit_sales_label}</span>
+                    )}
                     <br />
                     QR等 {yen(report.qr_sales_jpy)}
+                    {report.qr_sales_label && (
+                      <span>・{report.qr_sales_label}</span>
+                    )}
                     <br />
                     商品券 {yen(report.gift_certificate_jpy)}
+                    {report.gift_certificate_label && (
+                      <span>・{report.gift_certificate_label}</span>
+                    )}
                     <br />
                     その他 {yen(report.other_cashless_jpy)}
+                    {report.other_cashless_label && (
+                      <span>・{report.other_cashless_label}</span>
+                    )}
                   </td>
                   <td>
                     {report.voucher_count}枚・{yen(report.voucher_discount_jpy)}

@@ -38,14 +38,19 @@ export async function POST(request: Request) {
       return authJson({ message: "売上金額を確認してください。" }, 400);
     const client = await authClient();
     if (!client) return authJson({ message: "保存先へ接続できません。" }, 503);
-    const { error } = await client.rpc("portal_submit_manager_daily", {
+    const { error } = await client.rpc("portal_submit_manager_daily_v2", {
       p_store_id: input.storeId,
       p_report_date: input.reportDate,
       p_cash_sales_jpy: input.cashSalesJpy,
+      p_cash_sales_label: input.cashSalesLabel,
       p_credit_sales_jpy: input.creditSalesJpy,
+      p_credit_sales_label: input.creditSalesLabel,
       p_qr_sales_jpy: input.qrSalesJpy,
+      p_qr_sales_label: input.qrSalesLabel,
       p_gift_certificate_jpy: input.giftCertificateJpy,
+      p_gift_certificate_label: input.giftCertificateLabel,
       p_other_cashless_jpy: input.otherCashlessJpy,
+      p_other_cashless_label: input.otherCashlessLabel,
       p_labor_minutes: input.laborMinutes,
       p_voucher_count: input.voucherCount,
       p_voucher_discount_jpy: input.voucherDiscountJpy,

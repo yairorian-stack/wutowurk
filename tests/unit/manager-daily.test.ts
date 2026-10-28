@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   managerDailyInputSchema,
+  managerDailyRowSchema,
   managerSalesTotal,
   mergeManagerCashMonth,
   type ManagerCashExpense,
@@ -13,10 +14,15 @@ const input: ManagerDailyInput = {
   storeId: "honten",
   reportDate: "2026-10-27",
   cashSalesJpy: 4_000,
+  cashSalesLabel: "店頭現金",
   creditSalesJpy: 3_000,
+  creditSalesLabel: "VISA・JCB",
   qrSalesJpy: 2_000,
+  qrSalesLabel: "PayPay",
   giftCertificateJpy: 1_000,
+  giftCertificateLabel: "徳島県食事券",
   otherCashlessJpy: 0,
+  otherCashlessLabel: "",
   laborMinutes: 720,
   voucherCount: 2,
   voucherDiscountJpy: 500,
@@ -47,6 +53,43 @@ describe("manager daily report", () => {
     ).toBe(false);
   });
 
+  it("accepts optional tender labels and rejects unsafe labels", () => {
+    expect(managerDailyInputSchema.safeParse(input).success).toBe(true);
+    expect(
+      managerDailyInputSchema.safeParse({
+        ...input,
+        qrSalesLabel: "x".repeat(121),
+      }).success,
+    ).toBe(false);
+    expect(
+      managerDailyInputSchema.safeParse({
+        ...input,
+        creditSalesLabel: "VISA\u0000JCB",
+      }).success,
+    ).toBe(false);
+  });
+
+  it("treats labels from existing reports as empty when absent", () => {
+    const parsed = managerDailyRowSchema.parse({
+      store_id: "honten",
+      report_date: "2026-10-26",
+      sales_jpy: 100,
+      cash_sales_jpy: 100,
+      credit_sales_jpy: 0,
+      qr_sales_jpy: 0,
+      gift_certificate_jpy: 0,
+      other_cashless_jpy: 0,
+      labor_minutes: 60,
+      voucher_count: 0,
+      voucher_discount_jpy: 0,
+      memo: "",
+      revision: 1,
+      updated_at: "2026-10-26T00:00:00.000Z",
+    });
+    expect(parsed.cash_sales_label).toBe("");
+    expect(parsed.other_cashless_label).toBe("");
+  });
+
   it("replaces imported rows for the entered date and recalculates cash balance", () => {
     const base: SharedCashRow[] = [
       {
@@ -73,10 +116,15 @@ describe("manager daily report", () => {
       report_date: "2026-10-27",
       sales_jpy: 10_000,
       cash_sales_jpy: 4_000,
+      cash_sales_label: "店頭現金",
       credit_sales_jpy: 3_000,
+      credit_sales_label: "VISA・JCB",
       qr_sales_jpy: 2_000,
+      qr_sales_label: "PayPay",
       gift_certificate_jpy: 1_000,
+      gift_certificate_label: "徳島県食事券",
       other_cashless_jpy: 0,
+      other_cashless_label: "",
       labor_minutes: 720,
       voucher_count: 2,
       voucher_discount_jpy: 500,
@@ -101,6 +149,12 @@ describe("manager daily report", () => {
     expect(merged.filter((row) => row.transaction_date === "2026-10-27")).toHaveLength(6);
     expect(merged.find((row) => row.category === "売上")?.receipt_jpy).toBe(10_000);
     expect(merged.find((row) => row.category === "仕入れ")?.payment_jpy).toBe(500);
+    expect(merged.find((row) => row.category === "クレジット")?.description).toBe(
+      "VISA・JCB",
+    );
+    expect(merged.find((row) => row.category === "売上")?.description).toContain(
+      "店頭現金",
+    );
     expect(merged.find((row) => row.category === "割引券")?.description).toBe(
       "2枚・割引 500円",
     );

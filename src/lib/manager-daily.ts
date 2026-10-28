@@ -11,6 +11,7 @@ const cleanText = (max: number) =>
     .trim()
     .max(max)
     .refine((value) => !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/u.test(value));
+const tenderLabel = cleanText(120);
 
 export const managerExpenseInputSchema = z.object({
   category: cleanText(80).pipe(z.string().min(1, "区分を入力してください")),
@@ -24,10 +25,15 @@ export const managerDailyInputSchema = z.object({
   storeId: store,
   reportDate: isoDate,
   cashSalesJpy: money,
+  cashSalesLabel: tenderLabel,
   creditSalesJpy: money,
+  creditSalesLabel: tenderLabel,
   qrSalesJpy: money,
+  qrSalesLabel: tenderLabel,
   giftCertificateJpy: money,
+  giftCertificateLabel: tenderLabel,
   otherCashlessJpy: money,
+  otherCashlessLabel: tenderLabel,
   laborMinutes: z.number().int().min(0).max(600_000),
   voucherCount: z.number().int().min(0).max(100_000),
   voucherDiscountJpy: money,
@@ -42,10 +48,15 @@ export const managerDailyRowSchema = z.object({
   report_date: isoDate,
   sales_jpy: money,
   cash_sales_jpy: money,
+  cash_sales_label: z.string().max(120).default(""),
   credit_sales_jpy: money,
+  credit_sales_label: z.string().max(120).default(""),
   qr_sales_jpy: money,
+  qr_sales_label: z.string().max(120).default(""),
   gift_certificate_jpy: money,
+  gift_certificate_label: z.string().max(120).default(""),
   other_cashless_jpy: money,
+  other_cashless_label: z.string().max(120).default(""),
   labor_minutes: z.number().int().min(0).max(600_000),
   voucher_count: z.number().int().min(0).max(100_000),
   voucher_discount_jpy: money,
@@ -84,23 +95,29 @@ function managerCashRows(
     {
       transaction_date: report.report_date,
       category: "売上",
-      description: "店長日報入力",
+      description: report.cash_sales_label
+        ? `店長日報入力・現金: ${report.cash_sales_label}`
+        : "店長日報入力",
       receipt_jpy: report.sales_jpy,
       payment_jpy: 0,
     },
   ];
   const nonCash = [
-    ["クレジット", report.credit_sales_jpy],
-    ["QR・電子マネー", report.qr_sales_jpy],
-    ["商品券", report.gift_certificate_jpy],
-    ["その他キャッシュレス", report.other_cashless_jpy],
+    ["クレジット", report.credit_sales_jpy, report.credit_sales_label],
+    ["QR・電子マネー", report.qr_sales_jpy, report.qr_sales_label],
+    ["商品券", report.gift_certificate_jpy, report.gift_certificate_label],
+    [
+      "その他キャッシュレス",
+      report.other_cashless_jpy,
+      report.other_cashless_label,
+    ],
   ] as const;
-  for (const [category, amount] of nonCash)
+  for (const [category, amount, label] of nonCash)
     if (amount > 0)
       rows.push({
         transaction_date: report.report_date,
         category,
-        description: "店長日報・決済内訳",
+        description: label || "店長日報・決済内訳",
         receipt_jpy: 0,
         payment_jpy: amount,
       });
