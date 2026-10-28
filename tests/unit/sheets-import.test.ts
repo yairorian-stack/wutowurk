@@ -81,6 +81,12 @@ describe("羽ノ浦39期の確認済みセルによる年月と営業日報照�
     const wrong=grid();wrong[2][0]=2025;expect(()=>parseCashGrid(wrong,block,"2026-10-28")).toThrow();
     const wrongMonth=grid();wrongMonth[4][0]=9;expect(()=>parseCashGrid(wrongMonth,block,"2026-10-28")).toThrow();
   });
+  it("確認済み年月セルがある場合は、前年から残った曜日表示より年月日を優先する",()=>{
+    const copiedWeekday=grid();copiedWeekday[5][2]="土";
+    expect(parseCashGrid(copiedWeekday,block,"2026-10-28").rows[0].transaction_date).toBe("2026-10-01");
+    const invalidWeekday=grid();invalidWeekday[5][2]="休日";
+    expect(()=>parseCashGrid(invalidWeekday,block,"2026-10-28")).toThrow("SOURCE_VALIDATION_FAILED");
+  });
   it("繰越の補助行は保存せず、入金残高一致と設定された次行以降だけを使う",()=>{
     const parsed=parseCashGrid(grid(),block,"2026-10-28");
     expect(parsed.opening).toBe(500);
@@ -108,5 +114,29 @@ describe("羽ノ浦39期の確認済みセルによる年月と営業日報照�
     const rows=parseCashGrid(grid(),block,"2026-10-28").rows;
     expect(()=>crossCheckCashSales(rows,[{...sales[0],sales_date:"2026-09-01"}])).toThrow();
     const broken=grid();broken[6][7]=1501;expect(()=>parseCashGrid(broken,block,"2026-10-28")).toThrow();
+  });
+});
+
+describe("本店出納帳の明示年月セルと開始残高表記",()=>{
+  const grid=()=>[["有限会社 ウト・ウーク","","","","2026","10","月分 現金出納帳"],[],[2026],["月","日","曜","科目","概要","入金額","出金額","残高"],[10,1,"木","先月繰り越し","","","",1000],["","","","売上","",1500,"",2500]];
+  const block={store:"honten" as const,year:2026,month:10,firstRow:1,source:"honten-fixture",headerRows:4,yearCell:[3,0] as [number,number],monthCell:[1,5] as [number,number],labelsRow:4};
+  it("店舗名のない見出しでも、確認済み年月セルと『先月繰り越し』から解析する",()=>{
+    const parsed=parseCashGrid(grid(),block,"2026-10-28");
+    expect(parsed.opening).toBe(1000);
+    expect(parsed.rows[0]).toMatchObject({store_id:"honten",transaction_date:"2026-10-01",receipt_jpy:1500,balance_jpy:2500});
+  });
+  it("確認済みの残高不変見出しだけを無視し、未知の空欄明細は拒否する",()=>{
+    const reviewed=grid();
+    reviewed.push(["","","","阿南応援割","後日入金","","",2500]);
+    reviewed.push(["","","","食べてくクーポン","後日入金","","",2500]);
+    reviewed.push(["","","","クレジットカード","","","",2500]);
+    reviewed.push(["","","","領収書","","","",2500]);
+    expect(parseCashGrid(reviewed,block,"2026-10-28").rows).toHaveLength(1);
+
+    const unknown=grid();unknown.push(["","","","未知の科目","説明","","",2500]);
+    expect(()=>parseCashGrid(unknown,block,"2026-10-28")).toThrow("SOURCE_VALIDATION_FAILED");
+
+    const changed=grid();changed.push(["","","","阿南応援割","後日入金","","",2501]);
+    expect(()=>parseCashGrid(changed,block,"2026-10-28")).toThrow("SOURCE_VALIDATION_FAILED");
   });
 });
