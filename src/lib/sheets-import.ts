@@ -141,11 +141,22 @@ export function parseCashGrid(grid: unknown[][], block: CashBlock, asOf: string)
   for (let i = firstBodyRow; i < grid.length; i++) {
     const raw = grid[i], values = raw.map(cell);
     if (values.every(v => !v)) continue;
-    const category = cell(raw[3]), description = cell(raw[4]);
+    const rawCategory = cell(raw[3]), description = cell(raw[4]);
+    const category = rawCategory === "クレジットカード" ? "クレジット" : rawCategory;
     const receipt = sheetMoney(raw[5]), payment = sheetMoney(raw[6]), reported = sheetMoney(raw[7]);
-    if (/^(?:前月繰越|前月より繰越|繰越|開始残高)$/.test(category || description)) {
+    let rowDate = "";
+    if (cell(raw[0]) || cell(raw[1])) {
+      if (!cell(raw[1])) return fail();
+      const m = cell(raw[0]) ? Number(cell(raw[0]).replace(/月$/, "")) : block.month;
+      if (m !== block.month) return fail();
+      rowDate = japaneseSheetDate(`${m}月${cell(raw[1]).replace(/日$/, "")}日${cell(raw[2]) ? `(${cell(raw[2])})` : ""}`, block.year, [block.month]);
+    }
+    const openingLabel = (category || description) === "先月繰り越し" ? "前月繰越" : category || description;
+    if (/^(?:前月繰越|前月より繰越|繰越|開始残高)$/.test(openingLabel)) {
       if (rows.length || opening !== null || reported === null || receipt !== null || payment !== null) return fail();
-      opening = reported; balance = reported; continue;
+      opening = reported; balance = reported;
+      if (rowDate) date = rowDate;
+      continue;
     }
     if (/^(?:合計|月計|次月繰越)$/.test(category || description)) {
       if (reported !== null && reported !== balance) return fail();
@@ -153,14 +164,9 @@ export function parseCashGrid(grid: unknown[][], block: CashBlock, asOf: string)
     }
     // A reviewed month-marker row is metadata, not a dated transaction or inferred opening.
     if (block.monthCell?.[0] === i+1 && !cell(raw[1]) && !category && !description && receipt === null && payment === null && reported === null) continue;
-    if (cell(raw[0]) || cell(raw[1])) {
-      if (!cell(raw[1])) return fail();
-      const m = cell(raw[0]) ? Number(cell(raw[0]).replace(/月$/, "")) : block.month;
-      if (m !== block.month) return fail();
-      date = japaneseSheetDate(`${m}月${cell(raw[1]).replace(/日$/, "")}日${cell(raw[2]) ? `(${cell(raw[2])})` : ""}`, block.year, [block.month]);
-    }
+    if (rowDate) date = rowDate;
     if (receipt === null && payment === null) {
-      const placeholder = !description && (!category || (["売上", "クレジット", "PayPay", "後日入金券"].includes(category) && !!date));
+      const placeholder = !description && (!category || (["売上", "クレジット", "PayPay", "後日入金券", "領収書"].includes(category) && !!date));
       if (!placeholder || (reported !== null && reported !== balance)) return fail();
       continue;
     }

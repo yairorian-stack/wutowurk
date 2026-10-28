@@ -28,6 +28,26 @@ describe("非公開シート取込の厳密な解析",()=>{
     expect(parsed.rows.at(-1)).toMatchObject({payment_jpy:1000,receipt_jpy:0,balance_jpy:1000,source_key:"fixture:6"});
     expect(parseCashGrid(cash(),block,"2026-10-27")).toEqual(parsed);
   });
+  it("日付付き先月繰り越しを開始残高として扱い、直後の同日明細へ日付を引き継ぐ",()=>{
+    const grid=cash();
+    grid[2]=[10,26,"月","先月繰り越し","","","",1000];
+    grid[3].splice(0,3,"","","");
+    const parsed=parseCashGrid(grid,block,"2026-10-27");
+    expect(parsed.opening).toBe(1000);
+    expect(parsed.rows.map(row=>row.transaction_date)).toEqual(Array(3).fill("2026-10-26"));
+  });
+  it("クレジットカードを正規化し、金額なし・概要なし・残高不変の領収書行だけを補助行として扱う",()=>{
+    const grid=cash();
+    grid[4][3]="クレジットカード";
+    grid.push(["","","","領収書","","","",1000]);
+    const parsed=parseCashGrid(grid,block,"2026-10-27");
+    expect(parsed.rows).toHaveLength(3);
+    expect(parsed.rows[1].category).toBe("クレジット");
+    const changedBalance=structuredClone(grid);changedBalance.at(-1)![7]=1001;
+    expect(()=>parseCashGrid(changedBalance,block,"2026-10-27")).toThrow();
+    const described=structuredClone(grid);described.at(-1)![4]="説明";
+    expect(()=>parseCashGrid(described,block,"2026-10-27")).toThrow();
+  });
   it("未記入の定型行を取引にせず、残高変化や未知の明細は黙って捨てない",()=>{
     const grid=cash();grid.push([10,27,"火","売上","","","",1000]);
     expect(parseCashGrid(grid,block,"2026-10-27").rows).toHaveLength(3);
