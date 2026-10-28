@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import {
   ArrowRight,
@@ -213,10 +214,14 @@ function PortalContent({ view }: { view: View }) {
       </a>
       <aside className="sidebar">
         <Link href="/" className="brand" aria-label="WUTO-WURK ホーム">
-          <span className="brand-symbol">
-            w<span>•</span>
-          </span>
-          <span>
+          <Image
+            src="/wuto-wurk-logo.png"
+            alt=""
+            width={300}
+            height={211}
+            className="brand-logo"
+          />
+          <span className="brand-copy">
             <strong>WUTO-WURK</strong>
             <small>GROWTH PORTAL</small>
           </span>
@@ -285,8 +290,18 @@ function PortalContent({ view }: { view: View }) {
                 (view === "garbage" ? "本店ゴミ出し" : "試作品設定")}
             </strong>
           </div>
-          <Link href="/" className="mobile-brand">
-            WUTO-WURK<span>GROWTH PORTAL</span>
+          <Link href="/" className="mobile-brand" aria-label="WUTO-WURK ホーム">
+            <Image
+              src="/wuto-wurk-logo.png"
+              alt=""
+              width={300}
+              height={211}
+              className="mobile-brand-logo"
+            />
+            <span className="mobile-brand-copy">
+              <strong>WUTO-WURK</strong>
+              <small>GROWTH PORTAL</small>
+            </span>
           </Link>
           <div className="topbar-actions">
             <div className="store-select">

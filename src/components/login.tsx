@@ -1,6 +1,7 @@
 "use client";
+import Image from "next/image";
 import { useState, type FormEvent } from "react";
-import { ArrowRight, Leaf, LockKeyhole, Mail } from "lucide-react";
+import { ArrowRight, LockKeyhole, Mail } from "lucide-react";
 export function Login({ configured, otpAvailable = false, failed = false }: { configured: boolean; otpAvailable?: boolean; failed?: boolean }) {
   const [name, setName] = useState(""), [email, setEmail] = useState(""), [code, setCode] = useState("");
   const [stage, setStage] = useState<"email" | "code">("email"), [busy, setBusy] = useState(false);
@@ -27,7 +28,19 @@ export function Login({ configured, otpAvailable = false, failed = false }: { co
   function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); void perform(stage === "email" ? "request" : "verify"); }
   return (
     <main className="auth-page">
-      <div className="auth-brand"><Leaf size={28} /><strong>WUTO-WURK</strong><span>GROWTH PORTAL</span></div>
+      <div className="auth-brand">
+        <Image
+          src="/wuto-wurk-logo.png"
+          alt="レストランカフェ WUTO-WURK SINCE 1987"
+          width={300}
+          height={211}
+          className="auth-brand-logo"
+        />
+        <div className="auth-brand-copy">
+          <strong>WUTO-WURK</strong>
+          <span>GROWTH PORTAL</span>
+        </div>
+      </div>
       <section className="auth-card" aria-labelledby="login-title">
         <span className="auth-icon"><LockKeyhole size={28} /></span>
         <p className="eyebrow">GROW TOGETHER.</p><h1 id="login-title">スタッフログイン</h1>
