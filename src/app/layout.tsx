@@ -7,7 +7,7 @@ export const metadata: Metadata = {
     template: "%s | WUTO-WURK",
   },
   description:
-    "一皿から、その土地を好きになる。スタッフと店舗の、小さな一歩を育てるポータル。",
+    "世界１０ヵ国で、地域に必要とさせる飲食ブランドになる！！ 人に良いを基本とし、ワクワクと感動を創造し続けるスタッフポータル。",
   robots: { index: false, follow: false },
   appleWebApp: { capable: true, title: "WUTO-WURK", statusBarStyle: "default" },
 };
