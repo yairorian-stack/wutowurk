@@ -1,0 +1,39 @@
+name: Diagnose private sync setup once
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/sheets-sync-diagnostics.yml
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    environment: production-data-sync
+    timeout-minutes: 2
+    steps:
+      - name: Check required private configuration exists
+        env:
+          HAS_SERVICE_ACCOUNT: ${{ secrets.SHEETS_SERVICE_ACCOUNT_JSON != '' }}
+          HAS_SYNC_CONFIG: ${{ secrets.SHEETS_SYNC_CONFIG != '' }}
+          HAS_SUPABASE_URL: ${{ secrets.SUPABASE_SYNC_URL != '' }}
+          HAS_SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY != '' }}
+          SYNC_ENABLED: ${{ vars.SHEETS_SYNC_ENABLED == 'true' }}
+        shell: bash
+        run: |
+          missing=()
+          [ "$HAS_SERVICE_ACCOUNT" = "true" ] || missing+=("SHEETS_SERVICE_ACCOUNT_JSON")
+          [ "$HAS_SYNC_CONFIG" = "true" ] || missing+=("SHEETS_SYNC_CONFIG")
+          [ "$HAS_SUPABASE_URL" = "true" ] || missing+=("SUPABASE_SYNC_URL")
+          [ "$HAS_SUPABASE_KEY" = "true" ] || missing+=("SUPABASE_SERVICE_ROLE_KEY")
+          if [ ${#missing[@]} -gt 0 ]; then
+            printf 'Missing configuration names: %s\n' "${missing[*]}"
+            exit 1
+          fi
+          echo "All four required secrets exist."
+          if [ "$SYNC_ENABLED" = "true" ]; then
+            echo "Daily schedule variable is enabled."
+          else
+            echo "Daily schedule variable is still disabled."
+          fi
