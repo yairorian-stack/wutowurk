@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { japaneseSheetDate, parseSalesGrid, parseCashGrid, sheetMoney, crossCheckCashSales } from "../../src/lib/sheets-import";
+import { japaneseSheetDate, parseSalesGrid, parseFiscalSalesGrid, parseCashGrid, sheetMoney, crossCheckCashSales } from "../../src/lib/sheets-import";
 const blocks = [{store:"honten" as const,column:0,year:2026,months:[10,11]}];
 const sales = () => [["2026 本店", "売上高", "総労働時間", "人時売上高"], [], ["10月26日（月）","¥1,500","2.5"], ["10月27日（火）","",""]];
 const cash = () => [["2026年10月 本店"], ["月","日","曜","科目","概要","入金額","出金額","残高"], ["","","","前月繰越","","","","1,000"], [10,26,"月","売上","架空の取込テスト",1500,"",2500], ["","","","クレジット","架空の控除","",500,2000], ["","","","入金","銀行預入","",1000,1000]];
@@ -38,6 +38,35 @@ describe("非公開シート取込の厳密な解析",()=>{
     const missing=cash();missing.splice(2,1);expect(()=>parseCashGrid(missing,block,"2026-10-27")).toThrow();
     const wrongYear=cash();wrongYear[0][0]="2025年10月 本店";expect(()=>parseCashGrid(wrongYear,block,"2026-10-27")).toThrow();
     const wrongStore=cash();wrongStore[0][0]="2026年10月 羽ノ浦";expect(()=>parseCashGrid(wrongStore,block,"2026-10-27")).toThrow();
+  });
+});
+
+describe("通期売上の労働時間空欄プレースホルダー",()=>{
+  const fixture=()=>{
+    const formatted:unknown[][]=[[],[]],effective:unknown[][]=[[],[]];
+    formatted[0][0]="日程";formatted[0][1]="本店売上";formatted[0][4]="羽ノ浦売上";
+    formatted[0][9]="本店労働";formatted[0][10]="羽ノ浦労働";
+    const weekdays="日月火水木金土";let current=new Date("2026-08-01T00:00:00Z"),monthly=0;
+    while(current<=new Date("2027-07-31T00:00:00Z")){
+      const month=current.getUTCMonth()+1,day=current.getUTCDate();
+      if(day===1)monthly=0;monthly+=100;
+      const label=`${month}月${day}日（${weekdays[current.getUTCDay()]}）`;
+      const display:unknown[]=[label],raw:unknown[]=[label,100,monthly];
+      raw[9]=2;
+      formatted.push(display);effective.push(raw);
+      current=new Date(current.getTime()+86400000);
+    }
+    return {formatted,effective};
+  };
+  const config={fiscalYearStart:2026,firstDataRow:3,lastDataRow:367};
+  it("カンマと空白だけのセルは労働時間未入力として扱う",()=>{
+    const data=fixture();data.effective[71][9]=", ";data.formatted[71][9]=", ";
+    const parsed=parseFiscalSalesGrid(data.formatted,data.effective,config,"2027-07-31");
+    expect(parsed.find(row=>row.sales_date==="2026-10-09")?.labor_minutes).toBeNull();
+  });
+  it("任意の非数値文字列はこれまで通り拒否する",()=>{
+    const data=fixture();data.effective[71][9]="未確認";data.formatted[71][9]="未確認";
+    expect(()=>parseFiscalSalesGrid(data.formatted,data.effective,config,"2027-07-31")).toThrow("SOURCE_VALIDATION_FAILED");
   });
 });
 

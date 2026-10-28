@@ -5,6 +5,7 @@ export type SalesBlock = { store: "honten" | "816"; column: number; year: number
 const weekdays = "日月火水木金土";
 function fail(): never { throw new Error("SOURCE_VALIDATION_FAILED"); }
 const cell = (v: unknown) => v == null ? "" : String(v).normalize("NFKC").trim();
+const blankLaborPlaceholder = (v: unknown) => typeof v === "string" && /^[,、\s]+$/.test(v.normalize("NFKC"));
 export function sheetMoney(v: unknown): number | null {
   const text = cell(v);
   if (!text) return null;
@@ -86,8 +87,12 @@ export function parseFiscalSalesGrid(formatted: unknown[][], effective: unknown[
       if(typeof amount!=="number"||!Number.isSafeInteger(amount)||amount<0||amount>10000000000||date>asOf)return fail();
       const hours=raw[hoursColumn];let minutes:number|null=null;
       if(hours!==null&&hours!==undefined&&hours!==""){
-        if(typeof hours!=="number"||!Number.isFinite(hours)||hours<0||hours>10000)return fail();
-        minutes=Math.round(hours*60);
+        if(blankLaborPlaceholder(hours)){
+          minutes=null;
+        }else{
+          if(typeof hours!=="number"||!Number.isFinite(hours)||hours<0||hours>10000)return fail();
+          minutes=Math.round(hours*60);
+        }
       }
       const key=`${store}/${date.slice(0,7)}`,total=(totals.get(key)??0)+amount;
       if(!Number.isSafeInteger(total)||total>10000000000)return fail();totals.set(key,total);
