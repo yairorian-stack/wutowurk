@@ -28,7 +28,7 @@ service_roleは強い権限を持つため、Render/NEXT_PUBLIC変数/ブラウ�
    - `202610280002_cash_month_sources.sql`
    初期認証001〜売上003など適用済みmigrationは再実行しません。002は既存表・実績を保持し、両店対応と店舗/月/原本行キー、月別結果表、RPCを追加します。旧Honten一括RPCのservice_role実行許可は取り消し、新しい照合を迂回させません。
 5. 手動で**dry_run=false**。全社、本店店長、羽ノ浦店長、未認証で画面を確認します。本人のログインは所有者が操作し、テストで実ユーザーへ勝手にメールを送りません。
-6. レビュー後にworkflowをデフォルトブランチmainへ反映し、repository variable `SHEETS_SYNC_ENABLED=true`を設定。現在のPRは未mergeのまま維持し、自動mergeしません。GitHubの失敗通知を所有者が受信する設定にします。
+6. 日次workflow専用のPR #2はmainへ反映済みです。所有者側でmainのcheckout固定SHAを、この修正を含む新しいコミットへ更新してください。大きいポータルPR #1はmergeしません。初回確認後にrepository variable `SHEETS_SYNC_ENABLED=true`を設定し、GitHubの失敗通知を所有者が受信する設定にします。
 
 ## 非公開config v2
 
@@ -40,7 +40,13 @@ service_roleは強い権限を持つため、Render/NEXT_PUBLIC変数/ブラウ�
 - headerRows：取引解析より前の行数
 - 任意のsheetId、yearCell:[1始まり行番号,0始まり範囲内列]、monthCell、labelsRow
 
-羽ノ浦はyearCell:[3,0]、monthCell:[5,0]、labelsRow:4、headerRows:4。8/9月はenabled:false、10月だけenabled:true。正本のsheetId一致も必須です。現リリースでは羽ノ浦の有効化は確認済み2026年10月AD:AKだけに制限しています。8/9月を修正後に有効化するには、所有者の原本確認を経てコード側の制限とDBのblocked状態を別途レビューして解除します。秘密設定だけを誤って変えて公開させません。本店の初期範囲は2026年10月EF:ENです。
+羽ノ浦はyearCell:[3,0]、monthCell:[5,0]、labelsRow:4、headerRows:4。2026年10月には **openingValueRow:6** と **firstTransactionDate:"2026-10-01"** も必須です。8/9月はenabled:false、10月だけenabled:true。正本のsheetId一致も必須です。現リリースでは羽ノ浦の有効化は確認済み2026年10月AD:AKだけに制限しています。8/9月を修正後に有効化するには、所有者の原本確認を経てコード側の制限とDBのblocked状態を別途レビューして解除します。秘密設定だけを誤って変えて公開させません。本店の初期範囲は2026年10月EF:ENです。
+
+## 羽ノ浦10月の分割繰越（明示設定のみ）
+
+行5は月10・科目「先月繰り越し」で、日・曜・概要・入金・出金・残高は空欄。openingValueRowで指定した行6は月空欄・日1・曜は日本語1文字、科目/概要/出金は空欄、入金と残高が同額の開始残高です。指定行を探し直したり金額を推測したりせず、この組合せと違えばSOURCE_VALIDATION_FAILEDで停止します。出金0も空欄とは扱いません。
+
+行6は開始残高の補助行として消費し、入金明細や売上として保存しません。補助行の曜日は取引日の曜日検証には使用せず、そこから取引日も作りません。最初の無日付明細（行7以降）のために、別途レビュー済みのfirstTransactionDateを非公開configへ明示します。以後の実明細の日付/曜日・残高式・営業日報との同日売上照合は従来どおり厳密に検証します。本店の同一行の繰越形式は変更しません。
 
 ## 独立した検証と公開
 
@@ -55,7 +61,7 @@ service_roleは強い権限を持つため、Render/NEXT_PUBLIC変数/ブラウ�
 
 ## 定期実行・通知・制約
 
-GitHub ActionsはUTC21:00＝日本時間翌06:00に実行予定です。時刻の遅延/実行漏れがあり得るため更新日時を確認。Render Freeのスリープや有料cronに依存しません。利用枠・アカウント状態は設定時に確認し、課金を有効化しません。scheduleはmainにworkflowがある場合だけ動き、開発ブランチへpushするだけでは開始しません。公開repoの長期無活動で停止する場合もあります。
+GitHub ActionsはUTC21:00＝日本時間翌06:00に実行予定です。時刻の遅延/実行漏れがあり得るため更新日時を確認。Render Freeのスリープや有料cronに依存しません。利用枠・アカウント状態は設定時に確認し、課金を有効化しません。scheduleはmainにworkflowがある場合だけ動きます。現在は専用workflowがmain上で特定SHAをcheckoutする構成のため、開発ブランチへpushするだけでは実行対象は変わらず、固定SHAの更新が必要です。公開repoの長期無活動で停止する場合もあります。
 
 失敗月がある場合は他の正常月を処理してからjobを失敗扱いにし、GitHub通知で管理者へ知らせます。DBへ接続できれば月別警告も記録しますが、DB自体に接続できない失敗は画面に記録できません。既知の無効月は警告として残し、毎日の通知を増やすためだけにjob失敗にはしません。新しい自動メール/LINE送信先は設けません。
 

@@ -34,7 +34,7 @@ try {
     if (!["honten","816"].includes(source.store) || !Number.isInteger(source.year) || source.year<2026 || source.year>2100 || !Number.isInteger(source.month) || source.month<1 || source.month>12 || typeof source.enabled!=="boolean" || !/^[a-zA-Z0-9:_-]{1,160}$/.test(source.sourceId)) throw new Error("SYNC_FAILED");
     const key=`${source.store}/${source.year}/${source.month}`;
     if (months.has(key)) throw new Error("SYNC_FAILED"); months.add(key);
-    if (source.store==="816" && source.enabled && (source.year!==2026 || source.month!==10 || source.range!=="AD1:AK2000" || source.tab!=="39期目816　出納帳" || !Number.isInteger(source.sheetId) || JSON.stringify(source.yearCell)!=="[3,0]" || JSON.stringify(source.monthCell)!=="[5,0]" || source.labelsRow!==4 || source.headerRows!==4)) throw new Error("SYNC_FAILED");
+    if (source.store==="816" && source.enabled && (source.year!==2026 || source.month!==10 || source.range!=="AD1:AK2000" || source.tab!=="39期目816　出納帳" || !Number.isInteger(source.sheetId) || JSON.stringify(source.yearCell)!=="[3,0]" || JSON.stringify(source.monthCell)!=="[5,0]" || source.labelsRow!==4 || source.headerRows!==4 || source.openingValueRow!==6 || source.firstTransactionDate!=="2026-10-01")) throw new Error("SYNC_FAILED");
   }
   if (config.sales.range!=="A1:AC400") throw new Error("SYNC_FAILED");
   const dryRun = process.argv.includes("--dry-run");

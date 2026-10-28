@@ -59,7 +59,8 @@ export function parseSalesGrid(grid: unknown[][], blocks: SalesBlock[], asOf: st
   return rows;
 }
 export type CashBlock = { store?: "honten" | "816"; year: number; month: number; firstRow: number; source: string; headerRows: number;
-  yearCell?: [number, number]; monthCell?: [number, number]; labelsRow?: number };
+  yearCell?: [number, number]; monthCell?: [number, number]; labelsRow?: number;
+  openingValueRow?: number; firstTransactionDate?: string };
 
 export function parseCashGrid(grid: unknown[][], block: CashBlock, asOf: string): { opening: number; rows: SyncCash[] } {
   const store = block.store ?? "honten";
@@ -78,7 +79,23 @@ export function parseCashGrid(grid: unknown[][], block: CashBlock, asOf: string)
   // Nine-column month range: month/day/weekday/category/description/in/out/balance/(spacer).
   const rows: SyncCash[] = [];
   let date = "", opening: number | null = null, balance: number | null = null;
-  for (let i = block.headerRows; i < grid.length; i++) {
+  let firstBodyRow=block.headerRows;
+  const reviewedSplit=store==="816" && block.year===2026 && block.month===10;
+  if (reviewedSplit && block.openingValueRow!==6) return fail();
+  if (block.openingValueRow!==undefined) {
+    // Only the explicitly reviewed split layout is supported. Never search for an amount.
+    if (!reviewedSplit || block.firstRow!==1 || block.headerRows!==4 || block.openingValueRow!==6 || block.firstTransactionDate!=="2026-10-01") return fail();
+    const label=grid[4]??[], auxiliary=grid[5]??[];
+    if (cell(label[0])!=="10" || cell(label[3])!=="先月繰り越し" || [1,2,4,5,6,7].some(c=>cell(label[c])!=="")) return fail();
+    const receipt=sheetMoney(auxiliary[5]), reported=sheetMoney(auxiliary[7]);
+    if (cell(auxiliary[0])!=="" || cell(auxiliary[1])!=="1" || !/^[日月火水木金土]$/.test(cell(auxiliary[2])) || cell(auxiliary[3])!=="" || cell(auxiliary[4])!=="" || cell(auxiliary[6])!=="" || receipt===null || receipt<0 || receipt!==reported) return fail();
+    opening=receipt; balance=receipt;
+    // The auxiliary row is neither a transaction nor the source of a transaction date.
+    // The separately reviewed explicit date seeds subsequent undated detail rows.
+    date=block.firstTransactionDate;
+    firstBodyRow=6;
+  } else if (block.firstTransactionDate!==undefined) return fail();
+  for (let i = firstBodyRow; i < grid.length; i++) {
     const raw = grid[i], values = raw.map(cell);
     if (values.every(v => !v)) continue;
     const category = cell(raw[3]), description = cell(raw[4]);

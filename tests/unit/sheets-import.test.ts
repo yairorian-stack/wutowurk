@@ -42,15 +42,32 @@ describe("非公開シート取込の厳密な解析",()=>{
 });
 
 describe("羽ノ浦39期の確認済みセルによる年月と営業日報照合",()=>{
-  const grid=()=>[["旧表題2025"],[],[2026],["月","日","曜","科目","概要","入金額","出金額","残高"],[10,"","","前月繰越","","","",500],["",1,"木","売上","架空の10月明細",1000,"",1500]];
-  const block={store:"816" as const,year:2026,month:10,firstRow:1,source:"fixture-oct",headerRows:4,yearCell:[3,0] as [number,number],monthCell:[5,0] as [number,number],labelsRow:4};
+  const grid=()=>[["旧表題2025"],[],[2026],["月","日","曜","科目","概要","入金額","出金額","残高"],[10,"","","先月繰り越し","","","",""],["",1,"金","","",500,"",500],["","","","売上","架空の10月明細",1000,"",1500]];
+  const block={store:"816" as const,year:2026,month:10,firstRow:1,source:"fixture-oct",headerRows:4,yearCell:[3,0] as [number,number],monthCell:[5,0] as [number,number],labelsRow:4,openingValueRow:6,firstTransactionDate:"2026-10-01"};
   const sales=[{store_id:"816" as const,sales_date:"2026-10-01",sales_jpy:1000,labor_minutes:null}];
   it("誤った表題の年を使わず、行3/行5と列見出しを厳密に照合する",()=>{
     const parsed=parseCashGrid(grid(),block,"2026-10-28");
-    expect(parsed.rows[0]).toMatchObject({store_id:"816",transaction_date:"2026-10-01",source_key:"fixture-oct:6"});
+    expect(parsed.rows[0]).toMatchObject({store_id:"816",transaction_date:"2026-10-01",source_key:"fixture-oct:7"});
     expect(()=>crossCheckCashSales(parsed.rows,sales)).not.toThrow();
     const wrong=grid();wrong[2][0]=2025;expect(()=>parseCashGrid(wrong,block,"2026-10-28")).toThrow();
     const wrongMonth=grid();wrongMonth[4][0]=9;expect(()=>parseCashGrid(wrongMonth,block,"2026-10-28")).toThrow();
+  });
+  it("繰越の補助行は保存せず、入金残高一致と設定された次行以降だけを使う",()=>{
+    const parsed=parseCashGrid(grid(),block,"2026-10-28");
+    expect(parsed.opening).toBe(500);
+    expect(parsed.rows).toHaveLength(1);
+    expect(parsed.rows[0]).toMatchObject({source_order:7,receipt_jpy:1000,balance_jpy:1500,transaction_date:"2026-10-01"});
+    expect(()=>crossCheckCashSales(parsed.rows,sales)).not.toThrow();
+  });
+  it("金額/残高違い・科目/概要付き・出金あり・設定行ずれ・設定欠落を拒否する",()=>{
+    for (const [column,value] of [[7,501],[3,"売上"],[4,"説明"],[6,0],[6,1],[1,2],[5,""]] as const) {
+      const altered=grid();altered[5][column]=value;
+      expect(()=>parseCashGrid(altered,block,"2026-10-28")).toThrow("SOURCE_VALIDATION_FAILED");
+    }
+    for (const openingValueRow of [undefined,5,7])expect(()=>parseCashGrid(grid(),{...block,openingValueRow},"2026-10-28")).toThrow();
+    expect(()=>parseCashGrid(grid(),{...block,firstTransactionDate:undefined},"2026-10-28")).toThrow();
+    const label=grid();label[4][3]="繰越";expect(()=>parseCashGrid(label,block,"2026-10-28")).toThrow();
+    const moved=grid();moved.splice(5,0,[]);expect(()=>parseCashGrid(moved,block,"2026-10-28")).toThrow();
   });
   it("日報不一致・日報欠落・重複した売上は月単位の照合で拒否する",()=>{
     const rows=parseCashGrid(grid(),block,"2026-10-28").rows;
@@ -61,6 +78,6 @@ describe("羽ノ浦39期の確認済みセルによる年月と営業日報照�
   it("8・9月の数字を10月へずらして解釈せず、その日の売上と比較する",()=>{
     const rows=parseCashGrid(grid(),block,"2026-10-28").rows;
     expect(()=>crossCheckCashSales(rows,[{...sales[0],sales_date:"2026-09-01"}])).toThrow();
-    const broken=grid();broken[5][7]=1501;expect(()=>parseCashGrid(broken,block,"2026-10-28")).toThrow();
+    const broken=grid();broken[6][7]=1501;expect(()=>parseCashGrid(broken,block,"2026-10-28")).toThrow();
   });
 });
