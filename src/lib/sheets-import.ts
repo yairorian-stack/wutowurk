@@ -166,7 +166,8 @@ export function parseCashGrid(grid: unknown[][], block: CashBlock, asOf: string)
     if (block.monthCell?.[0] === i+1 && !cell(raw[1]) && !category && !description && receipt === null && payment === null && reported === null) continue;
     if (rowDate) date = rowDate;
     if (receipt === null && payment === null) {
-      const placeholder = !description && (!category || (["売上", "クレジット", "PayPay", "後日入金券", "領収書"].includes(category) && !!date));
+      const futureTemplate = date > asOf && description === "後日入金" && ["阿南応援割", "食べてくクーポン"].includes(category);
+      const placeholder = futureTemplate || (!description && (!category || (["売上", "クレジット", "PayPay", "後日入金券", "領収書"].includes(category) && !!date)));
       if (!placeholder || (reported !== null && reported !== balance)) return fail();
       continue;
     }

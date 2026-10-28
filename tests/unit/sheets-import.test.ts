@@ -48,6 +48,15 @@ describe("非公開シート取込の厳密な解析",()=>{
     const described=structuredClone(grid);described.at(-1)![4]="説明";
     expect(()=>parseCashGrid(described,block,"2026-10-27")).toThrow();
   });
+  it("未到来日の既知の後日入金テンプレートだけを金額なし補助行として扱う",()=>{
+    const grid=cash();
+    grid.push([10,28,"水","阿南応援割","後日入金","","",""]);
+    grid.push(["","","","食べてくクーポン","後日入金","","",""]);
+    expect(parseCashGrid(grid,block,"2026-10-27").rows).toHaveLength(3);
+    expect(()=>parseCashGrid(grid,block,"2026-10-28")).toThrow();
+    const unknown=structuredClone(grid);unknown.at(-1)![3]="未知の補助行";
+    expect(()=>parseCashGrid(unknown,block,"2026-10-27")).toThrow();
+  });
   it("未記入の定型行を取引にせず、残高変化や未知の明細は黙って捨てない",()=>{
     const grid=cash();grid.push([10,27,"火","売上","","","",1000]);
     expect(parseCashGrid(grid,block,"2026-10-27").rows).toHaveLength(3);
