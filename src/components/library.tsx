@@ -36,6 +36,7 @@ function CostSheetViewer({ selected, sheets, onSelect, onClose }: {
 }) {
  const dialog = useRef<HTMLDialogElement>(null);
  const [zoom, setZoom] = useState(0.7);
+ const [displayMode, setDisplayMode] = useState("interactive");
  useEffect(() => {
   const element = dialog.current;
   const previousOverflow = document.body.style.overflow;
@@ -45,8 +46,9 @@ function CostSheetViewer({ selected, sheets, onSelect, onClose }: {
  }, []);
  const original = new URL(selected.externalUrl!);
  const gid = new URLSearchParams(original.hash.slice(1)).get("gid");
- original.pathname = original.pathname.replace(/\/edit$/, "/preview");
+ if (displayMode === "preview") original.pathname = original.pathname.replace(/\/edit$/, "/preview");
  original.search = "";
+ if (displayMode === "interactive") original.searchParams.set("rm", "minimal");
  if (gid) original.searchParams.set("gid", gid);
  return <dialog ref={dialog} aria-labelledby="cost-sheet-title" onCancel={onClose}
   style={{position:"fixed", inset:0, margin:"auto", padding:0, border:"1px solid #dce6df", borderRadius:10, width:"96vw", maxWidth:1440, height:"94dvh", maxHeight:"94dvh", background:"#fff", color:"#18352c"}}>
@@ -61,16 +63,21 @@ function CostSheetViewer({ selected, sheets, onSelect, onClose }: {
       style={{minHeight:36, fontSize:13, lineHeight:1.2, padding:"5px 12px", border:"1px solid #285c49", borderRadius:8, background:sheet.id === selected.id ? "#285c49" : "#fff", color:sheet.id === selected.id ? "#fff" : "#285c49"}}>
       {sheet.id === "honten-recipe-costs" ? "本店" : sheet.id === "hanoura-recipe-costs" ? "羽ノ浦店" : sheet.title}
      </button>)}
+     <label style={{display:"flex", alignItems:"center", gap:4, fontSize:12}}>表示
+      <select aria-label="シートの表示方法" value={displayMode} onChange={e=>setDisplayMode(e.target.value)} style={{width:130, minHeight:36, padding:4, fontSize:13}}>
+       <option value="interactive">通常（選択・編集）</option><option value="preview">閲覧用</option>
+      </select>
+     </label>
      <label style={{display:"flex", alignItems:"center", gap:4, fontSize:12}}>倍率
       <select aria-label="表の表示倍率" value={zoom} onChange={e=>setZoom(Number(e.target.value))} style={{width:76, minHeight:36, padding:"4px", fontSize:13}}>
        {[0.5,0.6,0.7,0.85,1].map(value=><option key={value} value={value}>{Math.round(value*100)}%</option>)}
       </select>
      </label>
     </nav>
-    <p style={{fontSize:11, lineHeight:1.4, margin:"4px 0 0"}}>表示できない場合はGoogleでログインしてください。 <a href={selected.externalUrl} target="_blank" rel="noopener noreferrer">Googleで開く・編集</a></p>
+    <p style={{fontSize:11, lineHeight:1.4, margin:"4px 0 0"}}>本店は表の「仕込み名」でレシピを選べます（編集権限が必要）。空白・ログイン画面になる場合は、次のリンクから開いてください。 <a href={selected.externalUrl} target="_blank" rel="noopener noreferrer">レシピをGoogleで開く</a></p>
    </header>
    <div style={{flex:1, minHeight:0, overflow:"hidden", position:"relative"}}>
-    <iframe key={selected.id} src={original.toString()} title={selected.title} style={{position:"absolute", top:0, left:0, width:`${100/zoom}%`, height:`${100/zoom}%`, maxWidth:"none", transform:`scale(${zoom})`, transformOrigin:"top left", border:0, background:"#f5f7f5"}} />
+    <iframe key={`${selected.id}-${displayMode}`} src={original.toString()} title={selected.title} style={{position:"absolute", top:0, left:0, width:`${100/zoom}%`, height:`${100/zoom}%`, maxWidth:"none", transform:`scale(${zoom})`, transformOrigin:"top left", border:0, background:"#f5f7f5"}} />
    </div>
   </div>
  </dialog>;
