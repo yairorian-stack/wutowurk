@@ -1,5 +1,7 @@
 import type { Role } from "./domain";
-export const documents = [
+export type PortalDocument = { id: string; category: string; title: string; description: string; version: string; date: string; roles: Role[]; sections: string[][]; externalUrl?: string; };
+export const documents: PortalDocument[] = [
+  { id: "honten-recipe-costs", category: "原価・レシピ", title: "本店の原価管理表・仕込みレシピ", description: "仕入単価、仕込みの材料・分量、1回分と1個あたりの原価を確認できます。Googleスプレッドシートを別タブで開きます。", version: "1.0", date: "2026-10-29", roles: ["staff", "manager", "company", "system"], sections: [["原価管理", "仕入商品マスター 仕込みカード ハンバーグ 唐揚げ PIZZA レシピ"]], externalUrl: "https://docs.google.com/spreadsheets/d/1m3OGZebZmYTBglV1rr-I_l0LHDaGGpkcj8yFKVop3Tk/edit#gid=700105" },
   {
     id: "guide",
     category: "ポータル",
@@ -74,4 +76,5 @@ export const documents = [
     ],
   },
 ];
-export type PortalDocument = (typeof documents)[number];
+
+
