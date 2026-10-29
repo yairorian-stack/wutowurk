@@ -35,6 +35,7 @@ function CostSheetViewer({ selected, sheets, onSelect, onClose }: {
  onClose: () => void;
 }) {
  const dialog = useRef<HTMLDialogElement>(null);
+ const [zoom, setZoom] = useState(0.7);
  useEffect(() => {
   const element = dialog.current;
   const previousOverflow = document.body.style.overflow;
@@ -48,22 +49,29 @@ function CostSheetViewer({ selected, sheets, onSelect, onClose }: {
  original.search = "";
  if (gid) original.searchParams.set("gid", gid);
  return <dialog ref={dialog} aria-labelledby="cost-sheet-title" onCancel={onClose}
-  style={{position:"fixed", inset:0, margin:0, padding:0, border:0, width:"100vw", maxWidth:"none", height:"100dvh", maxHeight:"none", background:"#fff", color:"#18352c"}}>
+  style={{position:"fixed", inset:0, margin:"auto", padding:0, border:"1px solid #dce6df", borderRadius:10, width:"96vw", maxWidth:1440, height:"94dvh", maxHeight:"94dvh", background:"#fff", color:"#18352c"}}>
   <div style={{display:"flex", flexDirection:"column", height:"100%", paddingTop:"env(safe-area-inset-top)", paddingBottom:"env(safe-area-inset-bottom)", boxSizing:"border-box"}}>
-   <header style={{padding:"12px 16px", borderBottom:"1px solid #dce6df", flexShrink:0}}>
+   <header style={{padding:"6px 10px", borderBottom:"1px solid #dce6df", flexShrink:0}}>
     <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", gap:12}}>
-     <h2 id="cost-sheet-title" style={{fontSize:18, margin:0}}>原価管理表</h2>
-     <button type="button" autoFocus onClick={onClose} style={{minHeight:44, padding:"8px 16px"}}>閉じる</button>
+     <h2 id="cost-sheet-title" style={{fontSize:14, lineHeight:1.3, margin:0}}>原価管理表</h2>
+     <button type="button" autoFocus onClick={onClose} style={{minHeight:36, fontSize:13, lineHeight:1.2, padding:"5px 10px"}}>閉じる</button>
     </div>
-    <nav aria-label="原価管理の店舗" style={{display:"flex", flexWrap:"wrap", gap:8, marginTop:8}}>
+    <nav aria-label="原価管理の店舗" style={{display:"flex", flexWrap:"wrap", gap:6, marginTop:4}}>
      {sheets.map(sheet => <button type="button" key={sheet.id} aria-pressed={sheet.id === selected.id} onClick={()=>onSelect(sheet.id)}
-      style={{minHeight:44, padding:"8px 20px", border:"1px solid #285c49", borderRadius:8, background:sheet.id === selected.id ? "#285c49" : "#fff", color:sheet.id === selected.id ? "#fff" : "#285c49"}}>
+      style={{minHeight:36, fontSize:13, lineHeight:1.2, padding:"5px 12px", border:"1px solid #285c49", borderRadius:8, background:sheet.id === selected.id ? "#285c49" : "#fff", color:sheet.id === selected.id ? "#fff" : "#285c49"}}>
       {sheet.id === "honten-recipe-costs" ? "本店" : sheet.id === "hanoura-recipe-costs" ? "羽ノ浦店" : sheet.title}
      </button>)}
+     <label style={{display:"flex", alignItems:"center", gap:4, fontSize:12}}>倍率
+      <select aria-label="表の表示倍率" value={zoom} onChange={e=>setZoom(Number(e.target.value))} style={{width:76, minHeight:36, padding:"4px", fontSize:13}}>
+       {[0.5,0.6,0.7,0.85,1].map(value=><option key={value} value={value}>{Math.round(value*100)}%</option>)}
+      </select>
+     </label>
     </nav>
-    <p style={{fontSize:12, lineHeight:1.6, margin:"8px 0 0"}}>表示されない場合は、共有されたGoogleアカウントでログインしてください。 <a href={selected.externalUrl} target="_blank" rel="noopener noreferrer">Googleで開く・編集</a></p>
+    <p style={{fontSize:11, lineHeight:1.4, margin:"4px 0 0"}}>表示できない場合はGoogleでログインしてください。 <a href={selected.externalUrl} target="_blank" rel="noopener noreferrer">Googleで開く・編集</a></p>
    </header>
-   <iframe key={selected.id} src={original.toString()} title={selected.title} style={{width:"100%", flex:1, minHeight:0, border:0, background:"#f5f7f5"}} />
+   <div style={{flex:1, minHeight:0, overflow:"hidden", position:"relative"}}>
+    <iframe key={selected.id} src={original.toString()} title={selected.title} style={{position:"absolute", top:0, left:0, width:`${100/zoom}%`, height:`${100/zoom}%`, maxWidth:"none", transform:`scale(${zoom})`, transformOrigin:"top left", border:0, background:"#f5f7f5"}} />
+   </div>
   </div>
  </dialog>;
 }
