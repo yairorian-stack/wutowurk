@@ -21,6 +21,7 @@ import {
 } from "@/lib/shifts";
 import { downloadText } from "@/lib/download";
 import { csvText } from "@/lib/csv";
+import { ShiftSnapshot } from "./shift-snapshot";
 
 export function Shifts({ scope }: { scope: StoreId | "all" }) {
   const [shifts, setShifts] = useState<Shift[]>([]);
@@ -172,6 +173,7 @@ export function Shifts({ scope }: { scope: StoreId | "all" }) {
           このリンクを開いてもポータルへ自動同期されません。ログインが必要な場合はAirシフト側で行ってください。
         </p>
       </section>
+      <ShiftSnapshot scope={scope} />
       <details className="panel shift-import">
         <summary>
           紙のシフトを入力する <small>本店 / 1件ずつ追加</small>
