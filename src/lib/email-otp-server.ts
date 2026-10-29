@@ -28,7 +28,10 @@ export async function sendEmailOtp(email: string) {
     // Recheck server configuration before the scheduled side effect.
     if (!otpAllowlist().has(email) || !await emailOtpReady()) return;
     const client = mailClient()!;
-    const { error } = await client.auth.signInWithOtp({ email, options: { shouldCreateUser: false } });
+    // Only the private send allowlist reaches this point. First-time invited staff
+    // must be able to receive a code before an Auth account exists. Database
+    // invitation checks still gate membership after email ownership is verified.
+    const { error } = await client.auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
     if (error) console.warn("Email OTP delivery not confirmed; backup Google login remains available.");
   } catch {
     // No recipient, code, provider response body, token, or SMTP secret in logs.
