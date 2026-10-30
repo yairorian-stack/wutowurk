@@ -3,6 +3,7 @@ import { createSign, randomUUID } from "node:crypto";
 import { loadTsModule } from "./load-ts-module.mjs";
 const { parseFiscalSalesGrid, parseCashGrid, crossCheckCashSales } = await loadTsModule("src/lib/sheets-import.ts");
 const { parseStaffAccessGrid } = await loadTsModule("src/lib/staff-access-import.ts");
+const staffOnly = process.argv.includes("--staff-only");
 let supabase, serviceKey;
 const runId = process.env.GITHUB_RUN_ID ? `${process.env.GITHUB_RUN_ID}-${process.env.GITHUB_RUN_ATTEMPT ?? "1"}` : randomUUID();
 async function jsonFetch(url, options = {}) {
@@ -26,11 +27,16 @@ try {
   const config = JSON.parse(process.env.SHEETS_SYNC_CONFIG ?? "null");
   const account = JSON.parse(process.env.SHEETS_SERVICE_ACCOUNT_JSON ?? "null");
   if (!config || !account || !/^[^@\s]+@[^@\s]+\.iam\.gserviceaccount\.com$/.test(account.client_email) || typeof account.private_key !== "string") throw new Error("SYNC_FAILED");
+  if (!config.staffAccess && staffOnly) throw new Error("SOURCE_VALIDATION_FAILED");
+  if (staffOnly) {
+    const source=config.staffAccess;
+    if (!source || !/^[\w-]{20,100}$/.test(source.spreadsheetId) || !Number.isInteger(source.sheetId)
+      || typeof source.tab!=="string" || !source.tab.trim() || !/^A1:G(?:[2-9]\d?|[1-4]\d{2}|500)$/.test(source.range)) throw new Error("SOURCE_VALIDATION_FAILED");
+  } else {
   if (!Array.isArray(config.cashSources) || !config.cashSources.length || config.cashSources.length>24) throw new Error("SYNC_FAILED");
-  for (const source of [config.sales,...config.cashSources,...(config.staffAccess ? [config.staffAccess] : [])]) {
+  for (const source of [config.sales,...config.cashSources]) {
     if (!source || !/^[\w-]{20,100}$/.test(source.spreadsheetId) || typeof source.tab !== "string" || !/^[A-Z]+1:[A-Z]+\d+$/.test(source.range)) throw new Error("SYNC_FAILED");
   }
-  if (config.staffAccess && (!Number.isInteger(config.staffAccess.sheetId) || !/^A1:G(?:[2-9]\d?|[1-4]\d{2}|500)$/.test(config.staffAccess.range) || !config.staffAccess.tab.trim())) throw new Error("SYNC_FAILED");
   const months = new Set();
   for (const source of config.cashSources) {
     if (!["honten","816"].includes(source.store) || !Number.isInteger(source.year) || source.year<2026 || source.year>2100 || !Number.isInteger(source.month) || source.month<1 || source.month>12 || typeof source.enabled!=="boolean" || !/^[a-zA-Z0-9:_-]{1,160}$/.test(source.sourceId)) throw new Error("SYNC_FAILED");
@@ -39,6 +45,7 @@ try {
     if (source.store==="816" && source.enabled && (source.year!==2026 || source.month!==10 || source.range!=="AD1:AK2000" || source.tab!=="39期目816　出納帳" || !Number.isInteger(source.sheetId) || JSON.stringify(source.yearCell)!=="[3,0]" || JSON.stringify(source.monthCell)!=="[5,0]" || source.labelsRow!==4 || source.headerRows!==4 || source.openingValueRow!==6 || source.firstTransactionDate!=="2026-10-01")) throw new Error("SYNC_FAILED");
   }
   if(config.sales.format!=="fiscal-year-vertical"||config.sales.range!=="L1:V400"||config.sales.tab!=="2店舗合計 日間売上と人時売上"||!Number.isInteger(config.sales.sheetId)||!Number.isInteger(config.sales.fiscalYearStart)||config.sales.fiscalYearStart<2020||config.sales.fiscalYearStart>2100||config.sales.firstDataRow!==3||!Number.isInteger(config.sales.lastDataRow)||config.sales.lastDataRow<367||config.sales.lastDataRow>400)throw new Error("SYNC_FAILED");
+  }
   const dryRun = process.argv.includes("--dry-run");
   if (!dryRun) {
     supabase = process.env.SUPABASE_SYNC_URL;
@@ -54,9 +61,17 @@ try {
   if (typeof token?.access_token !== "string") throw new Error("SYNC_FAILED");
   const sourceRange = async source => {
     const headers={Authorization:`Bearer ${token.access_token}`};
-    const metadata=await jsonFetch(`https://sheets.googleapis.com/v4/spreadsheets/${source.spreadsheetId}?fields=sheets(properties(sheetId,title,gridProperties))`,{headers});
+    const metadata=await jsonFetch(`https://sheets.googleapis.com/v4/spreadsheets/${source.spreadsheetId}?fields=sheets(properties(sheetId,title,gridProperties),protectedRanges(range,warningOnly,unprotectedRanges))`,{headers});
     const sheet=metadata.sheets?.find(s=>s.properties?.title===source.tab)?.properties;
     if (!sheet || !Number.isInteger(sheet.gridProperties?.rowCount) || sheet.gridProperties.rowCount<1 || (source.sheetId!==undefined && sheet.sheetId!==source.sheetId)) throw new Error("SOURCE_VALIDATION_FAILED");
+    if(source===config.staffAccess) {
+      const item=metadata.sheets.find(s=>s.properties?.sheetId===source.sheetId);
+      const protectedWholeSheet=item?.protectedRanges?.some(p=>!p.warningOnly && !(p.unprotectedRanges?.length)
+        && p.range?.sheetId===source.sheetId && (p.range.startRowIndex??0)===0 && (p.range.startColumnIndex??0)===0
+        && (p.range.endRowIndex??sheet.gridProperties.rowCount)>=sheet.gridProperties.rowCount
+        && (p.range.endColumnIndex??sheet.gridProperties.columnCount)>=sheet.gridProperties.columnCount);
+      if(!protectedWholeSheet)throw new Error("SOURCE_VALIDATION_FAILED");
+    }
     const requested=Number(source.range.match(/\d+$/)[0]);
     const bound=Math.min(requested,sheet.gridProperties.rowCount);
     const boundedRange=source.range.replace(/\d+$/,String(bound));
@@ -87,10 +102,17 @@ try {
     }));
     return {formatted,effective};
   };
+  if (staffOnly) {
+    const rows=parseStaffAccessGrid(await read(config.staffAccess));
+    if (!dryRun) {
+      const result=await rpc("portal_apply_staff_access_sync",{p_run_id:runId,p_staff:rows});
+      console.log(`Staff-only sync applied ${result.total} validated rows. No sales/cash data read or changed.`);
+    } else console.log(`Staff-only dry run validated ${rows.length} rows; no writes or emails.`);
+    process.exit(0);
+  }
   const today = new Intl.DateTimeFormat("en-CA", { timeZone:"Asia/Tokyo",year:"numeric",month:"2-digit",day:"2-digit" }).format(new Date());
   const grid=await readFiscalSales(config.sales);
   const sales=parseFiscalSalesGrid(grid.formatted,grid.effective,config.sales,today);
-  const staffRows=config.staffAccess ? parseStaffAccessGrid(await read(config.staffAccess)) : null;
   if (!dryRun) await rpc("portal_apply_sales_sync",{p_run_id:runId,p_sales:sales});
   let failed=false, pending=false;
   for (const source of config.cashSources) {
@@ -109,24 +131,14 @@ try {
       console.error("Cash month not published; previous verified values retained. Review private source/status.");
     }
   }
-  if (staffRows) {
-    if (dryRun) {
-      const enabled=staffRows.filter(row=>row.enabled).length;
-      console.log(`Staff access dry run validated ${staffRows.length} rows (${enabled} enabled, ${staffRows.length-enabled} disabled); no permission changes applied.`);
-    } else {
-      const result=await rpc("portal_apply_staff_access_sync",{p_run_id:runId,p_staff:staffRows});
-      console.log(`Staff access sync applied: ${result.added} added, ${result.updated} updated, ${result.disabled} disabled.`);
-    }
-  } else {
-    console.log("Staff access sync is not configured; sales and cash sync continued unchanged.");
-  }
+  // Staff permissions are published exclusively by the separate staff-only workflow.
   if (!dryRun) await rpc("portal_finish_sheets_run",{p_run_id:runId});
   if (failed) process.exitCode=1;
   console.log(dryRun ? "Dry run finished; no database writes performed." : "Sales and independently verified cash months processed.");
   if (pending) console.log("Some cash months remain disabled for source review.");
 } catch (error) {
   const code = error instanceof Error && error.message === "SOURCE_VALIDATION_FAILED" ? error.message : "SYNC_FAILED";
-  if (supabase && serviceKey) {
+  if (!staffOnly && supabase && serviceKey) {
     try { await rpc("portal_record_sync_failure",{p_run_id:runId,p_code:code}); } catch { /* GitHub failure notifications remain the fallback. */ }
   }
   console.error(`${code}: previous verified data retained. Review the private source and connection settings.`);

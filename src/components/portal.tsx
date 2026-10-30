@@ -140,13 +140,15 @@ function PortalContent({ view }: { view: View }) {
         session: {
           role: member.role,
           storeId: member.store_id ?? storedState.session.storeId,
+          readAllStores: member.read_all_stores,
         },
       }
     : storedState;
   const [selectedScope, setSelectedScope] = useState<StoreId | "all" | null>(
     null,
   );
-  const scope = isGlobal(state.session.role)
+  const canChooseStore = isGlobal(state.session.role) || state.session.readAllStores === true;
+  const scope = canChooseStore
     ? (selectedScope ?? state.session.storeId)
     : state.session.storeId;
   const [modal, setModal] = useState<Modal>(null);
@@ -306,7 +308,7 @@ function PortalContent({ view }: { view: View }) {
           <div className="topbar-actions">
             <div className="store-select">
               <MapPin size={16} />
-              {isGlobal(state.session.role) ? (
+              {canChooseStore ? (
                 <select
                   value={scope}
                   aria-label="表示する店舗"

@@ -81,7 +81,7 @@ export const visionSchema = z
   })
   .refine((v) => v.start <= v.end, "開始年は終了年以前にしてください");
 export type Vision = z.infer<typeof visionSchema>;
-export type Session = { role: Role; storeId: StoreId };
+export type Session = { role: Role; storeId: StoreId; readAllStores?: boolean };
 export type PortalState = {
   version: 1;
   goals: Goal[];
@@ -92,6 +92,7 @@ export type PortalState = {
 export const sessionSchema = z.object({
   role: z.enum(["staff", "manager", "company", "system"]),
   storeId: z.enum(["honten", "816"]),
+  readAllStores: z.boolean().optional(),
 });
 export const portalSchema = z.object({
   version: z.literal(1),
@@ -169,10 +170,10 @@ export function isGlobal(role: Role) {
   return role === "company" || role === "system";
 }
 export function canRead(session: Session, storeId: StoreId) {
-  return isGlobal(session.role) || session.storeId === storeId;
+  return isGlobal(session.role) || session.readAllStores === true || session.storeId === storeId;
 }
 export function canEdit(session: Session, storeId: StoreId) {
-  return session.role !== "staff" && canRead(session, storeId);
+  return isGlobal(session.role) || (session.role === "manager" && session.storeId === storeId);
 }
 export function completion(goals: Goal[]) {
   return goals.length

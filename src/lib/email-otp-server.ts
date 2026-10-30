@@ -6,7 +6,10 @@ import { OtpGuard, parseOtpAllowlist } from "./otp-security";
 export const otpCookie = "wuto-email-attempt";
 const runtime = globalThis as typeof globalThis & { __wutoEmailOtpGuard?: OtpGuard };
 export const otpGuard = runtime.__wutoEmailOtpGuard ??= new OtpGuard();
-export const otpAllowlist = () => parseOtpAllowlist(process.env.PORTAL_OTP_ALLOWED_EMAILS);
+// The DB dispatcher checks the private, synchronized staff ledger. Null only
+// disables the duplicate local list; verified DB invitation checks remain mandatory.
+export const otpAllowlist = () => process.env.PORTAL_STAFF_OTP_MODE === "ledger"
+  ? null : parseOtpAllowlist(process.env.PORTAL_OTP_ALLOWED_EMAILS);
 function mailClient() {
   const config = authConfig();
   return config ? createClient(config.url, config.key, {
@@ -15,7 +18,13 @@ function mailClient() {
   }) : null;
 }
 export async function emailOtpReady() {
-  if (!otpAllowlist().size) return false;
+  if (process.env.PORTAL_STAFF_OTP_MODE === "ledger") {
+    try {
+      const { data, error } = await mailClient()!.rpc("portal_staff_otp_ready");
+      return !error && data === true;
+    } catch { return false; }
+  }
+  if (!otpAllowlist()?.size) return false;
   try {
     const client = mailClient();
     if (!client) return false;
@@ -26,8 +35,15 @@ export async function emailOtpReady() {
 export async function sendEmailOtp(email: string) {
   try {
     // Recheck server configuration before the scheduled side effect.
-    if (!otpAllowlist().has(email) || !await emailOtpReady()) return;
+    const allowlist = otpAllowlist();
+    if ((allowlist !== null && !allowlist.has(email)) || !await emailOtpReady()) return;
     const client = mailClient()!;
+    if (process.env.PORTAL_STAFF_OTP_MODE === "ledger") {
+      // Same opaque result for eligible, unlisted and rate-limited recipients.
+      const { error } = await client.rpc("portal_request_staff_otp", { p_email: email });
+      if (error) console.warn("Staff OTP dispatch unavailable.");
+      return;
+    }
     // Only the private send allowlist reaches this point. First-time invited staff
     // must be able to receive a code before an Auth account exists. Database
     // invitation checks still gate membership after email ownership is verified.

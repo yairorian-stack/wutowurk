@@ -9,12 +9,20 @@ import { sendEmailOtp } from "../../src/lib/email-otp-server";
 beforeEach(() => {
   vi.clearAllMocks();
   vi.stubEnv("PORTAL_OTP_ALLOWED_EMAILS", "invited@example.invalid");
+  vi.stubEnv("PORTAL_STAFF_OTP_MODE", "");
   mocks.createClient.mockReturnValue({ rpc: mocks.rpc, auth: { signInWithOtp: mocks.signInWithOtp } });
   mocks.rpc.mockResolvedValue({ data: true, error: null });
   mocks.signInWithOtp.mockResolvedValue({ error: null });
 });
 
 describe("招待済みスタッフへの初回メールOTP", () => {
+  it("台帳モードは手動リストを使わず、照会結果を返さないDB送信RPCだけを呼ぶ", async () => {
+    vi.stubEnv("PORTAL_STAFF_OTP_MODE", "ledger");
+    await sendEmailOtp("new-staff@example.invalid");
+    expect(mocks.rpc).toHaveBeenCalledWith("portal_staff_otp_ready");
+    expect(mocks.rpc).toHaveBeenCalledWith("portal_request_staff_otp", { p_email:"new-staff@example.invalid" });
+    expect(mocks.signInWithOtp).not.toHaveBeenCalled();
+  });
   it("許可済みの宛先は初回Authアカウント作成を伴うOTPを要求できる", async () => {
     await sendEmailOtp("invited@example.invalid");
     expect(mocks.signInWithOtp).toHaveBeenCalledExactlyOnceWith({

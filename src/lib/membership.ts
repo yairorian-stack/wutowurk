@@ -31,6 +31,7 @@ export const memberSchema = z.object({
   role: z.enum(["staff", "manager", "company", "system"]),
   store_id: z.enum(["honten", "816"]).nullable(),
   status: z.enum(["pending", "approved", "disabled"]),
+  read_all_stores: z.boolean().optional().default(false),
 });
 export type Member = z.infer<typeof memberSchema>;
 export const memberUpdateSchema = z

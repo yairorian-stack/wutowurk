@@ -40,7 +40,7 @@ export class OtpGuard {
     this.budgets.set(key, { count: (value?.count ?? 0) + 1, reset: value?.reset ?? now + 3600_000, last: now });
     return true;
   }
-  begin(email: string, ip: string, allowed: Set<string>, previous?: string) {
+  begin(email: string, ip: string, allowed: Set<string> | null, previous?: string) {
     this.prune();
     const key = hash(email), existing = previous ? this.attempts.get(previous) : undefined;
     if (existing?.emailHash === key && this.now() - existing.created < 60_000)
@@ -48,15 +48,15 @@ export class OtpGuard {
     if (previous) this.attempts.delete(previous);
     const token = randomBytes(32).toString("base64url");
     const room = this.attempts.size < 2048;
-    const eligible = room && allowed.has(email) && this.reserve("email:" + key, 5, 60_000) &&
+    const eligible = room && (allowed === null || allowed.has(email)) && this.reserve("email:" + key, 5, 60_000) &&
       this.reserve("ip:" + hash(ip), 10) && this.reserve("global", 30);
     if (room) this.attempts.set(token, { emailHash: key, created: this.now(), expires: this.now() + 600_000, tries: 0, eligible });
     return { token, send: eligible };
   }
-  consume(token: string | undefined, email: string, allowed: Set<string>) {
+  consume(token: string | undefined, email: string, allowed: Set<string> | null) {
     this.prune();
     const attempt = token ? this.attempts.get(token) : undefined;
-    if (!attempt || !attempt.eligible || attempt.emailHash !== hash(email) || !allowed.has(email) || attempt.tries >= 5) return false;
+    if (!attempt || !attempt.eligible || attempt.emailHash !== hash(email) || (allowed !== null && !allowed.has(email)) || attempt.tries >= 5) return false;
     attempt.tries++;
     return true;
   }

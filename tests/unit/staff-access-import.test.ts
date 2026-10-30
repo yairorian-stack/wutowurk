@@ -43,6 +43,7 @@ describe("スタッフ権限台帳", () => {
         role: "company",
         store_id: null,
         enabled: true,
+        read_all_stores: true,
       },
       {
         email: "staff@example.invalid",
@@ -51,8 +52,15 @@ describe("スタッフ権限台帳", () => {
         role: "staff",
         store_id: "honten",
         enabled: false,
+        read_all_stores: false,
       },
     ]);
+  });
+
+  it("一般スタッフの両店舗閲覧は役職・所属・管理権限を変えない", () => {
+    const rows=parseStaffAccessGrid([header,admin,["reader@example.invalid","架空 両店スタッフ","社員","本店","一般スタッフ","両店舗","有効"]]);
+    expect(rows[1]).toMatchObject({ role:"staff", store_id:"honten", read_all_stores:true });
+    expect(() => parseStaffAccessGrid([header,admin,["reader@example.invalid","架空","社員","本店","一般スタッフ","","有効"]])).toThrow();
   });
 
   it("正規化後の重複メールや店舗範囲の不一致を全件拒否する", () => {

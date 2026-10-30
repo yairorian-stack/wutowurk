@@ -5,6 +5,7 @@ export type StaffAccessRow = {
   role: "staff" | "manager" | "company" | "system";
   store_id: "honten" | "816" | null;
   enabled: boolean;
+  read_all_stores: boolean;
 };
 
 const headers = [
@@ -82,7 +83,7 @@ export function parseStaffAccessGrid(grid: unknown[][]): StaffAccessRow[] {
     const scope = store(rawScope);
     if (
       ((role === "staff" || role === "manager") &&
-        (!storeId || scope !== storeId)) ||
+        (!storeId || !rawScope || (scope !== null && scope !== storeId))) ||
       ((role === "company" || role === "system") &&
         (storeId !== null || scope !== null))
     )
@@ -95,6 +96,7 @@ export function parseStaffAccessGrid(grid: unknown[][]): StaffAccessRow[] {
       role,
       store_id: storeId,
       enabled,
+      read_all_stores: scope === null,
     });
   }
   if (
