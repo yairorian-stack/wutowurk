@@ -4,6 +4,7 @@ import { loadTsModule } from "./load-ts-module.mjs";
 const { parseFiscalSalesGrid, parseCashGrid, crossCheckCashSales } = await loadTsModule("src/lib/sheets-import.ts");
 const { parseStaffAccessGrid } = await loadTsModule("src/lib/staff-access-import.ts");
 const staffOnly = process.argv.includes("--staff-only");
+const salesOnly = process.argv.includes("--sales-only");
 let supabase, serviceKey;
 const runId = process.env.GITHUB_RUN_ID ? `${process.env.GITHUB_RUN_ID}-${process.env.GITHUB_RUN_ATTEMPT ?? "1"}` : randomUUID();
 async function jsonFetch(url, options = {}) {
@@ -26,6 +27,7 @@ async function rpc(name, payload) {
 try {
   const config = JSON.parse(process.env.SHEETS_SYNC_CONFIG ?? "null");
   const account = JSON.parse(process.env.SHEETS_SERVICE_ACCOUNT_JSON ?? "null");
+  if (staffOnly && salesOnly) throw new Error("SOURCE_VALIDATION_FAILED");
   if (!config || !account || !/^[^@\s]+@[^@\s]+\.iam\.gserviceaccount\.com$/.test(account.client_email) || typeof account.private_key !== "string") throw new Error("SYNC_FAILED");
   if (!config.staffAccess && staffOnly) throw new Error("SOURCE_VALIDATION_FAILED");
   if (staffOnly) {
@@ -113,6 +115,11 @@ try {
   const today = new Intl.DateTimeFormat("en-CA", { timeZone:"Asia/Tokyo",year:"numeric",month:"2-digit",day:"2-digit" }).format(new Date());
   const grid=await readFiscalSales(config.sales);
   const sales=parseFiscalSalesGrid(grid.formatted,grid.effective,config.sales,today);
+  if (salesOnly) {
+    if (!dryRun) await rpc("portal_apply_sales_sync",{p_run_id:runId,p_sales:sales});
+    console.log(`Sales-only ${dryRun ? "validation" : "sync"} completed for ${sales.length} rows. No cashbook or staff data read or changed.`);
+    process.exit(0);
+  }
   if (!dryRun) await rpc("portal_apply_sales_sync",{p_run_id:runId,p_sales:sales});
   let failed=false, pending=false;
   for (const source of config.cashSources) {
