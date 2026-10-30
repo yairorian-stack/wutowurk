@@ -1,4 +1,5 @@
 "use client";
+import { StorePerformance } from "./store-performance";
 import { SharedCashbook } from "./shared-cashbook";
 import { useState } from "react";
 import { Database, FlaskConical, Info } from "lucide-react";
@@ -51,6 +52,7 @@ export function FinanceDataMode({
   }
   if (shared) return <>
     <div className="page-intro finance-intro"><div><p className="eyebrow">SALES / DAILY REPORT / CASHBOOK</p><h1>売上・日報・現金出納帳</h1><p className="muted">提供された実績の確認</p></div></div>
+    <StorePerformance scope={scope} />
     {canEnterDaily && <ManagerDailyEntry shared={shared} scope={scope} />}
     {shared.status === "ready" ? <ImportedSalesPanel scope={scope} onAvailable={setHasImported} sharedData={shared.data} /> :
       <section className="panel"><h2>{shared.status === "pending" ? "実績データの反映準備中です" : "実績データを読み込めませんでした"}</h2><p>管理者へお問い合わせいただくか、時間をおいて再読み込みしてください。売上0円を示すものではありません。</p></section>}

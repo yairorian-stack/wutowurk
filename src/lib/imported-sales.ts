@@ -15,6 +15,7 @@ const storeValues = z.object({
   sales: money,
   cumulative: money,
   reportedYoy: z.number().min(0).max(10000).nullable(),
+  laborMinutes: z.number().int().min(0).max(600000).nullable().optional(),
 });
 export const importedSalesSchema = z
   .object({

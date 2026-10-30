@@ -18,6 +18,7 @@ import {
 
 export async function readSharedSales(
   member: Member,
+  summaryOnly = false,
 ): Promise<SharedSalesState> {
   if (
     member.status !== "approved" ||
@@ -29,7 +30,7 @@ export async function readSharedSales(
     if (!client) return { status: "unavailable" };
     const canonical = await client
       .from("portal_sales_records")
-      .select("store_id,sales_date,sales_jpy,reported_yoy")
+      .select("store_id,sales_date,sales_jpy,reported_yoy,labor_minutes")
       .order("sales_date")
       .limit(3001);
     if (!canonical.error) {
@@ -49,12 +50,12 @@ export async function readSharedSales(
             .order("last_success_at", { ascending: false })
             .limit(1)
             .maybeSingle(),
-          client
+          summaryOnly ? Promise.resolve({ data: [], error: null }) : client
             .from("portal_cash_months")
             .select("store_id,month,opening_jpy")
             .order("month", { ascending: false })
             .limit(25),
-          client
+          summaryOnly ? Promise.resolve({ data: [], error: null }) : client
             .from("portal_cash_sync_status")
             .select("store_id,month,status,message_code,last_success_at")
             .order("month", { ascending: false })
@@ -66,7 +67,7 @@ export async function readSharedSales(
             )
             .order("report_date")
             .limit(3001),
-          client
+          summaryOnly ? Promise.resolve({ data: [], error: null }) : client
             .from("portal_manager_cash_expenses")
             .select(
               "store_id,report_date,sort_order,category,description,amount_jpy",
@@ -191,6 +192,7 @@ export async function readSharedSales(
           sales_date: report.report_date,
           sales_jpy: report.sales_jpy,
           reported_yoy: null,
+          labor_minutes: report.labor_minutes,
         })),
       ];
       if (salesRows.length)

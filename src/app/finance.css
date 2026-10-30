@@ -1714,3 +1714,23 @@
     padding-right: 3px;
   }
 }
+
+.store-performance { padding: 26px; display: grid; gap: 16px; }
+.store-performance-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.store-performance-heading h2 { display: flex; align-items: center; gap: 9px; font-size: 19px; }
+.store-performance-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 16px; }
+.store-performance-card { min-width: 0; padding: 22px; border: 1px solid var(--border); border-radius: 14px; background: #fbfcf9; }
+.store-performance-card h3 { display: flex; align-items: center; gap: 8px; font-size: 17px; }
+.store-performance-card dl { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 18px 0; }
+.store-performance-card dt { font-size: 12px; color: #59685d; }
+.store-performance-card dd { margin: 6px 0 0; font-size: clamp(23px, 2.5vw, 31px); font-weight: 700; line-height: 1.4; overflow-wrap: anywhere; }
+.store-performance-card dd small { font-size: 12px; margin-left: 4px; font-weight: 400; }
+.performance-pending { color: #77796c; font-size: 22px; }
+.performance-week-detail { border-top: 1px solid var(--border); margin-top: 14px; padding-top: 12px; }
+@media (max-width: 600px) {
+  .store-performance { padding: 18px; }
+  .store-performance-card { padding: 18px; }
+  .store-performance-heading h2 { font-size: 17px; }
+}
+.store-performance-card .store-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--green); }
+.store-performance-card .store-dot.orange { background: var(--orange); }

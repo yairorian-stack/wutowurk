@@ -1,5 +1,5 @@
 // Pure parsing only. No network, credentials or real source data belong here.
-export type SyncSale = { store_id: "honten" | "816"; sales_date: string; sales_jpy: number; labor_minutes: number | null };
+export type SyncSale = { store_id: "honten" | "816"; sales_date: string; sales_jpy: number; labor_minutes: number | null; reported_yoy?: number | null };
 export type SyncCash = { store_id: "honten" | "816"; transaction_date: string; source_key: string; source_order: number; category: string; description: string; receipt_jpy: number; payment_jpy: number; balance_jpy: number };
 export type SalesBlock = { store: "honten" | "816"; column: number; year: number; months: number[] };
 const weekdays = "日月火水木金土";
@@ -80,7 +80,7 @@ export function parseFiscalSalesGrid(formatted: unknown[][], effective: unknown[
     }else if(cell(raw[0])!==label)return fail();
     if(date<start||date>end||date<=previous||dates.has(date))return fail();
     previous=date;dates.add(date);
-    for(const [store,column,cumulativeColumn,hoursColumn] of [["honten",1,2,9],["816",4,5,10]] as const){
+    for(const [store,column,cumulativeColumn,hoursColumn,yoyColumn] of [["honten",1,2,9,3],["816",4,5,10,6]] as const){
       const amount=raw[column];
       if(amount===null||amount===undefined||amount==="")continue; // Ignore every formula-only aggregate for a blank daily cell.
       if(typeof amount!=="number"||!Number.isSafeInteger(amount)||amount<0||amount>10000000000||date>asOf)return fail();
@@ -93,7 +93,11 @@ export function parseFiscalSalesGrid(formatted: unknown[][], effective: unknown[
       if(!Number.isSafeInteger(total)||total>10000000000)return fail();totals.set(key,total);
       const cumulative=raw[cumulativeColumn];
       if(cumulative!==null&&cumulative!==undefined&&cumulative!==""&&(typeof cumulative!=="number"||cumulative!==total))return fail();
-      rows.push({store_id:store,sales_date:date,sales_jpy:amount,labor_minutes:minutes});
+      // These are cumulative same-date YoY ratios, not daily ratios to average.
+      // A missing/error denominator must not invalidate otherwise valid sales.
+      const ratio=raw[yoyColumn];
+      const yoy=typeof ratio==="number"&&Number.isFinite(ratio)&&ratio>=0&&ratio<=100 ? Math.round(ratio*10000)/100 : null;
+      rows.push({store_id:store,sales_date:date,sales_jpy:amount,labor_minutes:minutes,reported_yoy:yoy});
     }
   }
   const expectedDays=(Date.parse(`${end}T00:00:00Z`)-Date.parse(`${start}T00:00:00Z`))/86400000+1;

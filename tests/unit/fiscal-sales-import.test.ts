@@ -46,3 +46,13 @@ describe("39期の縦型通期売上",()=>{
     expect(()=>parse(fixture)).toThrow();
   });
 });
+
+
+it("同月累計の比率を百分率に変換し、計算エラーを0%に変えない",()=>{
+  const fixture=fiscalFixture({"2026-10-26":{honten:100,hanoura:200}});
+  fixture.effective[index("2026-10-26")][3]=1.23456;
+  fixture.effective[index("2026-10-26")][6]="#ERROR!";
+  const rows=parse(fixture);
+  expect(rows[0].reported_yoy).toBe(123.46);
+  expect(rows[1].reported_yoy).toBeNull();
+});

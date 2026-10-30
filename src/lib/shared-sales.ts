@@ -19,6 +19,7 @@ const rawRow = z.object({
   store_id: z.enum(["honten", "816"]), sales_date: z.string(),
   sales_jpy: nullableMoney, cumulative_jpy: nullableMoney,
   reported_yoy: z.number().min(0).max(10000).nullable(),
+  labor_minutes: z.number().int().min(0).max(600000).nullable().optional(),
 });
 export function sharedSalesFromRows(header: unknown, input: unknown): ImportedSales {
   const batch = z.object({ source: z.string().min(1).max(100), as_of: z.string() }).parse(header);
@@ -31,7 +32,7 @@ export function sharedSalesFromRows(header: unknown, input: unknown): ImportedSa
     seen.add(key);
     if (!days.has(row.sales_date)) days.set(row.sales_date, { date: row.sales_date,
       honten: { sales: null, cumulative: null, reportedYoy: null }, "816": { sales: null, cumulative: null, reportedYoy: null } });
-    days.get(row.sales_date)![row.store_id] = { sales: row.sales_jpy, cumulative: row.cumulative_jpy, reportedYoy: row.reported_yoy };
+    days.get(row.sales_date)![row.store_id] = { sales: row.sales_jpy, cumulative: row.cumulative_jpy, reportedYoy: row.reported_yoy, laborMinutes: row.labor_minutes ?? null };
   }
   // The same parser as the reviewed import validates every month's cumulative sums.
   // A store hidden by RLS stays null; it is never fetched with an administrator key.

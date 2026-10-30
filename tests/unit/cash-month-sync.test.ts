@@ -16,7 +16,7 @@ beforeAll(async()=>{
     create table auth.identities(user_id uuid,provider text,identity_data jsonb);
     create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
     create function auth.jwt() returns jsonb language sql stable as $$select coalesce(nullif(current_setting('request.jwt.claims',true),''),'{}')::jsonb$$;`);
-  for(const file of ["202610250001_membership.sql","202610260001_google_allowlist.sql","202610260002_email_otp.sql","202610260003_shared_sales.sql","202610280001_sheets_sync.sql","202610280002_cash_month_sources.sql"])await db.exec(readFileSync(`supabase/migrations/${file}`,"utf8"));
+  for(const file of ["202610250001_membership.sql","202610260001_google_allowlist.sql","202610260002_email_otp.sql","202610260003_shared_sales.sql","202610280001_sheets_sync.sql","202610280002_cash_month_sources.sql","202610300001_store_performance.sql"])await db.exec(readFileSync(`supabase/migrations/${file}`,"utf8"));
   for(let i=0;i<4;i++){
     const email=`cash${i}@example.invalid`;
     await db.query("insert into auth.users values($1,$2,now())",[ids[i],email]);
@@ -95,5 +95,17 @@ describe("通期解析結果の日次upsert",()=>{
     expect((await db.query("select * from portal_sales_records")).rows).toHaveLength(6);
     expect((await db.query("select * from portal_sales_records where sales_date='2026-10-01'")).rows).toHaveLength(2);
     expect((await db.query("select * from portal_cash_records where active")).rows).toHaveLength(2);
+  });
+});
+
+
+describe("営業日報の累計前年比の保存",()=>{
+  it("同じスナップショットの前年比・労働時間を保存し、欠落した比率を過去値で埋めない",async()=>{
+    const sale={store_id:"816",sales_date:"2026-10-28",sales_jpy:100,labor_minutes:60,reported_yoy:125.55};
+    await db.query("select portal_apply_sales_sync('yoy-one',$1)",[JSON.stringify([sale])]);
+    expect((await db.query("select reported_yoy::float,labor_minutes from portal_sales_records where store_id='816' and sales_date='2026-10-28'")).rows[0]).toEqual({reported_yoy:125.55,labor_minutes:60});
+    await expect(db.query("select portal_apply_sales_sync('yoy-bad',$1)",[JSON.stringify([{...sale,reported_yoy:10001}])])).rejects.toThrow("SOURCE_VALIDATION_FAILED");
+    await db.query("select portal_apply_sales_sync('yoy-two',$1)",[JSON.stringify([{...sale,reported_yoy:null}])]);
+    expect((await db.query("select reported_yoy from portal_sales_records where store_id='816' and sales_date='2026-10-28'")).rows[0]).toEqual({reported_yoy:null});
   });
 });

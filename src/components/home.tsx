@@ -28,6 +28,7 @@ import {
   type PortalState,
   type StoreId,
 } from "@/lib/domain";
+import { StorePerformance } from "./store-performance";
 import { BrandArt } from "./brand-art";
 import { Empty, GoalCard, Progress, SectionHeading } from "./ui";
 
@@ -99,6 +100,7 @@ export function Home({
           <BrandArt />
           <div className="banner-caption">作る・囲む・残る</div>
         </section>
+        <StorePerformance session={state.session} scope="all" />
         <Link href="/daily" className="daily-home-link">
           <span className="daily-home-icon">
             <CalendarDays size={23} />
