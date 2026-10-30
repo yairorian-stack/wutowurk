@@ -1,0 +1,42 @@
+name: Private staff access sync
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Validate the staff ledger without changing access'
+        type: boolean
+        default: true
+permissions:
+  contents: read
+concurrency:
+  group: private-staff-access-import
+  cancel-in-progress: false
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    environment: production-data-sync
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: bc4895ce374b43fb349d59f7a0d79dee32417b8e
+          persist-credentials: false
+          fetch-depth: 1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - run: npm ci --ignore-scripts
+      - name: Validate or synchronize staff only
+        env:
+          SHEETS_SERVICE_ACCOUNT_JSON: ${{ secrets.SHEETS_SERVICE_ACCOUNT_JSON }}
+          SHEETS_SYNC_CONFIG: ${{ secrets.SHEETS_SYNC_CONFIG }}
+          SUPABASE_SYNC_URL: ${{ secrets.SUPABASE_SYNC_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+        shell: bash
+        run: |
+          if [ "$DRY_RUN" = "true" ]; then
+            node scripts/sync-google-sheets.mjs --staff-only --dry-run
+          else
+            node scripts/sync-google-sheets.mjs --staff-only
+          fi
