@@ -34,6 +34,17 @@ export const memberSchema = z.object({
   read_all_stores: z.boolean().optional().default(false),
 });
 export type Member = z.infer<typeof memberSchema>;
+// The shared portal layout can survive navigation with an older member snapshot.
+// Recheck only our authenticated session endpoint; never infer rights from storage.
+export function memberAccessChanged(current: Member, payload: unknown) {
+  if (!payload || typeof payload !== "object" || !("member" in payload)) return false;
+  const parsed = memberSchema.safeParse(payload.member);
+  if (!parsed.success) return false;
+  const next = parsed.data;
+  return current.user_id !== next.user_id || current.email !== next.email ||
+    current.role !== next.role || current.store_id !== next.store_id ||
+    current.status !== next.status || current.read_all_stores !== next.read_all_stores;
+}
 export const memberUpdateSchema = z
   .object({
     userId: z.uuid(),

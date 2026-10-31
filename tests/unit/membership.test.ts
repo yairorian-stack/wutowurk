@@ -3,9 +3,19 @@ import { authConfig, allowedOrigin } from "../../src/lib/auth-config";
 import {
   loginSchema,
   memberUpdateSchema,
+  memberAccessChanged,
+  memberSchema,
   normalizedName,
 } from "../../src/lib/membership";
 describe("ログインと登録情報の入力検証", () => {
+  it("ログイン継続中の店長昇格・所属変更・無効化・閲覧範囲の変更を再読込し、同じ権限では入力画面を更新しない", () => {
+    const member = memberSchema.parse({ user_id: "11111111-1111-4111-8111-111111111111", email: "manager@example.invalid", display_name: "架空 店長", job_title: "店長業務", role: "staff", store_id: "honten", status: "approved" });
+    expect(memberAccessChanged(member, { member })).toBe(false);
+    for (const patch of [{ role: "manager" }, { store_id: "816" }, { status: "disabled" }, { read_all_stores: true }])
+      expect(memberAccessChanged(member, { member: { ...member, ...patch } })).toBe(true);
+    expect(memberAccessChanged(member, { member: { role: "system" } })).toBe(false);
+    expect(memberAccessChanged(member, null)).toBe(false);
+  });
   it("氏名・メールを必須にし、不正メールと制御文字を拒否する", () => {
     expect(
       loginSchema.safeParse({ displayName: "", email: "staff@example.com" })
