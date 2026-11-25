@@ -12,3 +12,5 @@ next-env.d.ts
 
 out-review/
 test-results-auth/
+
+test-results-cashbook/
