@@ -29,3 +29,8 @@ function autoInstallOwner_(u){
   installCashbook_();
   props_().setProperty('CASHBOOK_INSTALL_READY','true');
 }
+
+function configuredDocuments_(){
+  var settings=__PRIVATE_CONFIG__;
+  return {ownerEmail:settings.ownerEmail,documents:settings.documents||[]};
+}

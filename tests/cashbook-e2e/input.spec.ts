@@ -32,3 +32,15 @@ test('元帳の読み取りエラーだけでは端末のログイン情報を�
  await page.reload();await expect(page.getByRole('alert')).toContainText('元帳読み取りエラー');expect(await page.evaluate(()=>localStorage.getItem('cashbook-session'))).toBe(token);
  await page.unroute('**/rpc');await page.reload();await expect(page.getByLabel('担当者名')).toHaveValue('架空スタッフ');
 });
+
+
+test('登録ユーザーだけに原本への閲覧ボタンを表示する',async({page})=>{
+ await page.goto('/');await expect(page.getByRole('link',{name:'現金出納帳を見る'})).toHaveCount(0);
+ await login(page);const cash=page.getByRole('link',{name:'現金出納帳を見る'}),sales=page.getByRole('link',{name:'売上管理を見る'});
+ await expect(cash).toHaveAttribute('href','https://docs.google.com/spreadsheets/d/fictional_cash_workbook_123/edit#gid=7');await expect(sales).toHaveAttribute('href','https://docs.google.com/spreadsheets/d/fictional_sales_workbook_123/edit#gid=9');await expect(cash).toHaveAttribute('target','_blank');await expect(sales).toHaveAttribute('rel','noopener noreferrer');
+ await page.getByRole('button',{name:'ログアウト',exact:true}).click();await expect(cash).toHaveCount(0);
+});
+test('資料の確認失敗でも出納帳の入力は継続できる',async({page})=>{
+ await page.route('**/rpc',async route=>{if(route.request().postDataJSON().name==='getCashbookDocuments')await route.fulfill({json:{error:'fictional permissions failure'}});else await route.continue();});
+ await login(page);await expect(page.locator('#document-status')).toContainText('入力は続けられます');await expect(page.getByLabel('総売上高（税込）')).toBeVisible();await page.getByLabel('総売上高（税込）').fill('1000');await expect(page.locator('#cash-sales')).toHaveText('¥1,000');
+});
