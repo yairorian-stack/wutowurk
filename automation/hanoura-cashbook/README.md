@@ -79,6 +79,8 @@ node scripts/build-hanoura-cashbook.mjs
 
 配布物は `node scripts/build-cashbook-mac-setup.mjs private-config.json private-output-directory` で生成します。private configの項目は `spreadsheetId`, `sourceGid`, `startDate`, `ownerEmail`, `users`（メールをキー、値はname/role/enabled）。実設定と配布ZIPはGit外の非公開領域に置きます。架空設定だけをテストで使用します。
 
-初回GETは設定のみ登録し、シートや共有を変更しません。許可メールのOTPで管理者本人を確認した後、一般公開を解除（個別共有は維持）し、保存用タブ・非公開写真フォルダを作成します。残高と運用開始日の承認はサイトで別途行います。Googleの初回実行承認がWeb側で進まない場合のみエディタから `ownerSetup_` を実行します。既存記入済み営業日を上書きしません。
+初回GETは設定のみ登録し、シートや共有を変更しません。許可メールのOTPで管理者本人を確認した後、一般公開を解除（個別共有は維持）し、保存用タブ・非公開写真フォルダを作成します。残高と運用開始日の承認はサイトで別途行います。Googleの初回実行承認がWeb側で進まない場合のみエディタから `doGet` を実行し権限を承認します。既存記入済み営業日を上書きしません。
 
 claspの管理権限はscript.projects/script.deployments/script.webapp.deploy/drive.file/userinfoに限定。Google APIで確認したWEB_APPのURLだけを発行し、ローカル認証情報と状態を所有者のLibrary/Application Support/WUTO-WURK-Cashbookに保存します。作成結果が不明な通信失敗では再作成を止め、既存プロジェクトIDが一致しなければpushしません。初回承認・実メール・本番保存は所有者の認証後の確認が必要です。詳細は `mac-setup/使い方.md`。
+
+既存プロジェクト用の再開版はprivate configに `resumeScriptId` を指定します。Googleからの読み取りで旧コード・接続先・ユーザーを照合し、元のファイルと公開一覧をMacに保存した後に接続を復元します。指定外のローカル状態や追加のリモートファイルがあれば停止します。アップロード専用ディレクトリを使い、claspが初回取得するCode.jsと配布するCode.gsの重複を防ぎます。秘密情報や個人用プロジェクトIDをリポジトリへ含めません。

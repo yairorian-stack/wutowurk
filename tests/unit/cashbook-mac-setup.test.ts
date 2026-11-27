@@ -49,3 +49,32 @@ describe('Private bootstrap（架空設定のみ）',()=>{
   properties.set('CASHBOOK_SPREADSHEET_ID','different');expect(()=>vm.runInContext('ownerBootstrapIfNeeded_()',context)).toThrow('接続先');
  });
 });
+
+describe('確認した既存プロジェクトからの再開',()=>{
+ const expected={spreadsheetId:'fictional_spreadsheet_id',sourceGid:7,emails:['owner@example.invalid','staff@example.invalid']};
+ const remoteCode='var CashCore={}; function ownerSetup_(){} function saveCashbookDay(){} function verifyCashbookCode(){} // CASHBOOK_SPREADSHEET_ID fictional_spreadsheet_id 7 owner@example.invalid staff@example.invalid';
+ function resume(f:ReturnType<typeof fixture>,code=remoteCode){
+  writeFileSync(join(f.bundle,'owner.json'),JSON.stringify({email:'owner@example.invalid',resumeScriptId:id,expectedSource:expected}));
+  writeFileSync(join(f.root,'creation-pending'),'ambiguous prior response');
+  const execute=f.options.execute;
+  return {...f.options,execute:async(cmd:string,args:string[])=>{
+   if(args.includes('pull')){f.calls.push(args);const path=args[args.indexOf('-P')+1].replace(/\.clasp\.json$/,'');writeFileSync(join(path,'コード.js'),code);writeFileSync(join(path,'appsscript.json'),'{}');return JSON.stringify({pulledFiles:['コード.js','appsscript.json']});}
+   return execute(cmd,args);
+  }};
+ }
+ it('backs up and validates existing source before push; recovers pending creation without creating a project',async()=>{
+  const f=fixture();try{const options=resume(f);await install(f.bundle,options);const state=JSON.parse(readFileSync(join(f.root,'installation.json'),'utf8'));expect(state.scriptId).toBe(id);expect(readFileSync(join(state.sourceBackup,'コード.js'),'utf8')).toBe(remoteCode);expect(existsSync(join(state.sourceBackup,'deployments-backup.json'))).toBe(true);expect(f.calls.some(a=>a.includes('create-script'))).toBe(false);expect(f.calls.findIndex(a=>a.includes('pull'))).toBeLessThan(f.calls.findIndex(a=>a.includes('push')));expect(existsSync(join(f.root,'creation-pending'))).toBe(false);const project=JSON.parse(readFileSync(join(f.root,'project/.clasp.json'),'utf8'));expect(project.rootDir).toBe(join(f.root,'project/managed'));expect(existsSync(join(project.rootDir,'Code.gs'))).toBe(true);await install(f.bundle,options);expect(f.calls.filter(a=>a.includes('push'))).toHaveLength(1);}finally{f.cleanup();}
+ });
+ it('does not push, clear the pending marker, or adopt a project whose source differs',async()=>{
+  const f=fixture();try{await expect(install(f.bundle,resume(f,remoteCode.replace('fictional_spreadsheet_id','other_book')))).rejects.toThrow('一致しません');expect(f.calls.some(a=>a.includes('push'))).toBe(false);expect(existsSync(join(f.root,'creation-pending'))).toBe(true);expect(existsSync(join(f.root,'installation.json'))).toBe(false);}finally{f.cleanup();}
+ });
+ it('refuses conflicting local state instead of changing targets',async()=>{
+  const f=fixture();try{const options=resume(f);writeFileSync(join(f.root,'installation.json'),JSON.stringify({scriptId:'unrelated_project'}));await expect(install(f.bundle,options)).rejects.toThrow('異なります');expect(f.calls.some(a=>a.includes('pull')||a.includes('push'))).toBe(false);}finally{f.cleanup();}
+ });
+ it('stops on extra remote source files without replacing them',async()=>{
+  const f=fixture();try{const options=resume(f),execute=options.execute;await expect(install(f.bundle,{...options,execute:async(cmd:string,args:string[])=>{const result=await execute(cmd,args);if(args.includes('pull')){const path=args[args.indexOf('-P')+1].replace(/\.clasp\.json$/,'');writeFileSync(join(path,'別の業務.js'),'function other(){}');}return result;}})).rejects.toThrow('ファイル構成');expect(f.calls.some(a=>a.includes('push'))).toBe(false);}finally{f.cleanup();}
+ });
+ it('never uploads the initially pulled Code.js alongside the managed Code.gs',async()=>{
+  const f=fixture();try{const execute=f.options.execute;await install(f.bundle,{...f.options,execute:async(cmd:string,args:string[])=>{const result=await execute(cmd,args);if(args.includes('create-script'))writeFileSync(join(f.root,'project/Code.js'),'function myFunction(){}');if(args.includes('push')){const project=JSON.parse(readFileSync(join(f.root,'project/.clasp.json'),'utf8'));expect(project.rootDir).toBe(join(f.root,'project/managed'));expect(existsSync(join(project.rootDir,'Code.js'))).toBe(false);}return result;}});}finally{f.cleanup();}
+ });
+});

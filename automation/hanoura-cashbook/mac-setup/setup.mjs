@@ -1,6 +1,6 @@
 // Runs on the owner's Mac. Credentials remain in the owner's private local folder.
 import {spawn,spawnSync}from'node:child_process';
-import{mkdirSync,existsSync,readFileSync,writeFileSync,chmodSync,copyFileSync,unlinkSync}from'node:fs';
+import{mkdirSync,existsSync,readFileSync,writeFileSync,chmodSync,copyFileSync,unlinkSync,mkdtempSync,readdirSync}from'node:fs';
 import{homedir}from'node:os';
 import{join,dirname}from'node:path';
 import{fileURLToPath}from'node:url';
@@ -11,7 +11,17 @@ export function validatePayload(folder){
  const manifest=JSON.parse(readFileSync(join(folder,'payload','appsscript.json'),'utf8'));
  const code=readFileSync(join(folder,'payload','Code.gs'),'utf8');
  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(owner.email)||manifest.webapp?.access!=='ANYONE'||manifest.webapp?.executeAs!=='USER_DEPLOYING'||!manifest.dependencies?.enabledAdvancedServices?.some(s=>s.userSymbol==='Sheets'&&s.serviceId==='sheets')||!code.includes('function ownerBootstrapIfNeeded_')||!code.includes('function autoInstallOwner_'))throw new Error('設定ファイルを確認できません。配布されたフォルダをそのまま使ってください。');
+ if(owner.resumeScriptId&&(!/^[a-zA-Z0-9_-]{20,}$/.test(owner.resumeScriptId)||!owner.expectedSource?.spreadsheetId||!Number.isInteger(owner.expectedSource.sourceGid)||!Array.isArray(owner.expectedSource.emails)||!owner.expectedSource.emails.includes(owner.email)))throw new Error('再開対象の設定が不完全です');
  return {owner,codeHash:createHash('sha256').update(code+'\n'+JSON.stringify(manifest)).digest('hex')};
+}
+export function verifyRecoverySource(folder,expected){
+ const files=readdirSync(folder).filter(name=>!name.startsWith('.'));
+ const scripts=files.filter(name=>/\.(?:js|gs)$/.test(name));
+ if(scripts.length!==1||files.some(name=>name!=='appsscript.json'&&name!==scripts[0]))throw new Error('対象プロジェクトのファイル構成が異なります。変更せず停止しました');
+ const code=readFileSync(join(folder,scripts[0]),'utf8');
+ const markers=['var CashCore','function ownerSetup_','function saveCashbookDay','function verifyCashbookCode','CASHBOOK_SPREADSHEET_ID',expected.spreadsheetId,String(expected.sourceGid),...expected.emails];
+ if(!markers.every(marker=>code.includes(marker)))throw new Error('出納帳の接続先・利用者・コードが一致しません。変更せず停止しました');
+ JSON.parse(readFileSync(join(folder,'appsscript.json'),'utf8'));
 }
 function redact(s){return String(s).replace(/Bearer\s+[^\s"']+/gi,'Bearer [非表示]').replace(/((?:access_token|refresh_token|client_secret)["']?\s*[:=]\s*["']?)[^\s"',}]+/gi,'$1[非表示]').replace(/([?&]code=)[^&\s]+/g,'$1[非表示]');}
 export async function install(bundle,options={}){
@@ -33,9 +43,17 @@ export async function install(bundle,options={}){
  }));
  const log=options.log||console.log;
  const open=options.open||(url=>spawnSync('/usr/bin/open',[url],{stdio:'ignore'}));
- const cli=async(args,{json=false,live=false,authProject=false}={})=>{
-   const settings=authProject?join(authDir,'.clasp.json'):projectFile;
-   const output=await execute(process.execPath,[sdk,'-A',authFile,'-P',settings,...(json?['--json']:[]),...args],{live,cwd:authProject?authDir:project});
+ const cli=async(args,{json=false,live=false,authProject=false,projectOverride=null}={})=>{
+   const settings=projectOverride?join(projectOverride,'.clasp.json'):authProject?join(authDir,'.clasp.json'):projectFile;
+   let output;
+   try{output=await execute(process.execPath,[sdk,'-A',authFile,'-P',settings,...(json?['--json']:[]),...args],{live,cwd:projectOverride||(authProject?authDir:project)});}
+   catch(error){
+     if(projectOverride&&/has not enabled|Apps Script API.*disabled|script\.google\.com\/home\/usersettings/i.test(error.message)){
+       open('https://script.google.com/home/usersettings');
+       throw new Error('Googleの「Apps Script API」を有効にしてから、このファイルをもう一度開いてください。既存のコードは変更していません');
+     }
+     throw error;
+   }
    if(!json)return output;
    try{return JSON.parse(output);}catch{throw new Error('Google公式ツールの応答を確認できません。設定を止めました。');}
  };
@@ -55,6 +73,26 @@ export async function install(bundle,options={}){
    account=await cli(['show-authorized-user'],{json:true,authProject:true});
  }
  if(!account.loggedIn||String(account.email).toLowerCase()!==owner.email.toLowerCase())throw new Error('予定している管理者アカウントと異なります。アカウントを確認してください。他の人の認証情報をコピーしないでください。');
+ if(owner.resumeScriptId){
+   if(state.scriptId&&state.scriptId!==owner.resumeScriptId)throw new Error('Macに記録された対象と異なります。別のプロジェクトへは変更しません');
+   if(existsSync(projectFile)&&JSON.parse(readFileSync(projectFile,'utf8')).scriptId!==owner.resumeScriptId)throw new Error('Macの接続先が異なります。上書きせず停止しました');
+   if(!state.recoveryVerified){
+     log('3/5 指定された既存プロジェクトを読み取り、接続先・利用者を照合しています…');
+     const backup=mkdtempSync(join(root,'source-backup-'));
+     writeFileSync(join(backup,'.clasp.json'),JSON.stringify({scriptId:owner.resumeScriptId,rootDir:'.'}),{mode:0o600});
+     await cli(['pull'],{json:true,projectOverride:backup});
+     verifyRecoverySource(backup,owner.expectedSource);
+     // Preserve both the original code and the list of existing deployments locally.
+     const deployments=await cli(['list-deployments'],{json:true,projectOverride:backup});
+     writeFileSync(join(backup,'deployments-backup.json'),JSON.stringify(deployments,null,2),{mode:0o600});
+     state={...state,scriptId:owner.resumeScriptId,recoveryVerified:true,sourceBackup:backup};save(state);
+     writeFileSync(projectFile,JSON.stringify({scriptId:state.scriptId,rootDir:join(project,'managed')}),{mode:0o600});
+     if(existsSync(pendingFile))unlinkSync(pendingFile);
+     log('既存コードをこのMacにバックアップしました。プロジェクトを新規作成せず再開します。');
+   }
+   if(!existsSync(projectFile))writeFileSync(projectFile,JSON.stringify({scriptId:state.scriptId,rootDir:join(project,'managed')}),{mode:0o600});
+   if(existsSync(pendingFile))unlinkSync(pendingFile);
+ }
  if(existsSync(projectFile)){
    const local=JSON.parse(readFileSync(projectFile,'utf8'));
    if(!state.scriptId||state.scriptId!==local.scriptId)throw new Error('登録済みプロジェクトの識別情報が一致しません。既存コードを上書きせず停止しました。');
@@ -74,10 +112,13 @@ export async function install(bundle,options={}){
      }throw error;
    }
  }
+ // Keep the managed upload isolated from clasp's initially pulled Code.js.
+ const managed=join(project,'managed');mkdirSync(managed,{recursive:true,mode:0o700});
+ writeFileSync(projectFile,JSON.stringify({scriptId:state.scriptId,rootDir:managed}),{mode:0o600});
  if(state.codeHash!==codeHash){
    log('4/5 許可ユーザー・接続先・画面・保存処理を登録しています…');
-   for(const file of ['Code.gs','appsscript.json'])copyFileSync(join(bundle,'payload',file),join(project,file));
-   // Only the newly created, locally tracked project can reach this command.
+   for(const file of ['Code.gs','appsscript.json'])copyFileSync(join(bundle,'payload',file),join(managed,file));
+   // Only a tracked new project or an explicitly verified recovery target can reach this command.
    await cli(['push','--force'],{json:true});
    let deployed;
    if(state.deploymentId)deployed=await cli(['update-deployment',state.deploymentId,'--description','816 protected cashbook'],{json:true});
