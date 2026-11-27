@@ -38,7 +38,7 @@ describe('Private bootstrap（架空設定のみ）',()=>{
  it('sets a fixed roster without sheet access; admin proof is required to restrict sharing/install',()=>{
   const config={spreadsheetId:'fictional',sourceGid:7,startDate:'2026-11-25',ownerEmail:'owner@example.invalid',users:{'owner@example.invalid':{role:'admin',enabled:true}}};
   const properties=new Map<string,string>();let changes=0,installed=0;
-  const context=vm.createContext({props_:()=>({getProperty:(k:string)=>properties.get(k)||null,setProperty:(k:string,v:string)=>properties.set(k,v)}),config_:()=>({id:config.spreadsheetId}),DriveApp:{Access:{PRIVATE:'PRIVATE'},Permission:{VIEW:'VIEW'},getFileById:()=>({getSharingAccess:()=>'ANYONE',setSharing:()=>changes++})},installCashbook_:()=>installed++});
+  const context=vm.createContext({props_:()=>({getProperty:(k:string)=>properties.get(k)||null,setProperty:(k:string,v:string)=>properties.set(k,v)}),config_:()=>({id:config.spreadsheetId}),hash_:(v:string)=>v,withLock_:(fn:()=>unknown)=>fn(),DriveApp:{Access:{PRIVATE:'PRIVATE'},Permission:{VIEW:'VIEW'},getFileById:()=>({getSharingAccess:()=>'ANYONE',setSharing:()=>changes++})},installCashbook_:()=>installed++});
   vm.runInContext(readFileSync('automation/hanoura-cashbook/mac-setup/bootstrap.gs','utf8').replaceAll('__PRIVATE_CONFIG__',JSON.stringify(config)),context);
   vm.runInContext('ownerBootstrapIfNeeded_()',context);expect(changes).toBe(0);expect(installed).toBe(0);
   expect(()=>vm.runInContext("autoInstallOwner_({email:'other@example.invalid',role:'admin'})",context)).toThrow('管理者本人');
@@ -96,5 +96,20 @@ describe('Google公式claspのURL応答',()=>{
    for(const command of ['push','create-deployment'])expect(f.calls.filter(args=>args.includes(command))).toHaveLength(1);
    expect(readFileSync(join(f.root,'専用URL.txt'),'utf8')).not.toContain('authUser');
   }finally{f.cleanup();}
+ });
+});
+
+
+describe('登録メンバーの追加',()=>{
+ it('adds only approved missing members once and preserves disabled members and manual revocation',()=>{
+  const users={'owner@example.invalid':{name:'架空管理者',role:'admin',enabled:true},'old@example.invalid':{name:'架空既存',role:'entry',enabled:true},'new@example.invalid':{name:'架空追加',role:'entry',enabled:true}};
+  const config={spreadsheetId:'fictional',sourceGid:7,startDate:'2026-11-25',ownerEmail:'owner@example.invalid',users};
+  const existing={...users};delete (existing as Partial<typeof users>)['new@example.invalid'];existing['old@example.invalid'].enabled=false;
+  const properties=new Map<string,string>([['CASHBOOK_USERS',JSON.stringify(existing)]]);
+  const context=vm.createContext({props_:()=>({getProperty:(k:string)=>properties.get(k)||null,setProperty:(k:string,v:string)=>properties.set(k,v)}),hash_:(v:string)=>v,withLock_:(fn:()=>unknown)=>fn()});
+  vm.runInContext(readFileSync('automation/hanoura-cashbook/mac-setup/bootstrap.gs','utf8').replaceAll('__PRIVATE_CONFIG__',JSON.stringify(config)),context);
+  vm.runInContext('ownerBootstrapIfNeeded_()',context);
+  const roster=JSON.parse(properties.get('CASHBOOK_USERS')!);expect(roster['new@example.invalid'].role).toBe('entry');expect(roster['old@example.invalid'].enabled).toBe(false);expect(roster['owner@example.invalid'].role).toBe('admin');
+  delete roster['new@example.invalid'];properties.set('CASHBOOK_USERS',JSON.stringify(roster));vm.runInContext('ownerBootstrapIfNeeded_()',context);expect(JSON.parse(properties.get('CASHBOOK_USERS')!)['new@example.invalid']).toBeUndefined();
  });
 });

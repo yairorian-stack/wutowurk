@@ -12,7 +12,7 @@ execFileSync(process.execPath,['scripts/build-hanoura-cashbook.mjs',payload]);
 const helper=readFileSync(join(source,'mac-setup/bootstrap.gs'),'utf8').replaceAll('__PRIVATE_CONFIG__',JSON.stringify(config));
 const code=helper+'\n'+readFileSync(join(payload,'Code.gs'),'utf8');
 writeFileSync(join(payload,'Code.gs'),code,{mode:0o600});
-writeFileSync(join(output,'owner.json'),JSON.stringify({email:config.ownerEmail,...(config.resumeScriptId?{resumeScriptId:config.resumeScriptId,expectedSource:{spreadsheetId:config.spreadsheetId,sourceGid:config.sourceGid,emails:Object.keys(config.users)}}:{})}),{mode:0o600});
+writeFileSync(join(output,'owner.json'),JSON.stringify({email:config.ownerEmail,...(config.resumeScriptId?{resumeScriptId:config.resumeScriptId,expectedSource:{spreadsheetId:config.spreadsheetId,sourceGid:config.sourceGid,emails:config.recoveryEmails||Object.keys(config.users)}}:{})}),{mode:0o600});
 for(const file of ['setup.mjs','816自動設定.command'])copyFileSync(join(source,'mac-setup',file),join(output,file));
 chmodSync(join(output,'816自動設定.command'),0o755);
 copyFileSync(join(source,'mac-setup/使い方.md'),join(output,'使い方.md'));

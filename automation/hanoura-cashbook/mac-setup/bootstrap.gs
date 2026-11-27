@@ -10,7 +10,15 @@ function ownerBootstrapIfNeeded_(){
   if(!existing)p.setProperty('CASHBOOK_SPREADSHEET_ID',settings.spreadsheetId);
   if(!p.getProperty('CASHBOOK_SOURCE_GID'))p.setProperty('CASHBOOK_SOURCE_GID',String(settings.sourceGid));
   if(!p.getProperty('CASHBOOK_START_DATE'))p.setProperty('CASHBOOK_START_DATE',settings.startDate);
-  if(!p.getProperty('CASHBOOK_USERS'))p.setProperty('CASHBOOK_USERS',JSON.stringify(settings.users));
+  var rosterVersion=hash_(JSON.stringify(settings.users));
+  if(p.getProperty('CASHBOOK_ROSTER_VERSION')!==rosterVersion){
+    withLock_(function(){
+      var raw=p.getProperty('CASHBOOK_USERS'),users=raw?JSON.parse(raw):{};
+      Object.keys(settings.users).forEach(function(email){if(!Object.prototype.hasOwnProperty.call(users,email))users[email]=settings.users[email];});
+      p.setProperty('CASHBOOK_USERS',JSON.stringify(users));
+      p.setProperty('CASHBOOK_ROSTER_VERSION',rosterVersion);
+    });
+  }
 }
 function autoInstallOwner_(u){
   var settings=__PRIVATE_CONFIG__;
