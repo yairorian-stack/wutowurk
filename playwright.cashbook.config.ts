@@ -1,0 +1,2 @@
+import {defineConfig,devices}from'@playwright/test';
+export default defineConfig({testDir:'./tests/cashbook-e2e',outputDir:'test-results-cashbook',workers:2,use:{baseURL:'http://127.0.0.1:3125',launchOptions:{executablePath:'/usr/bin/chromium',args:['--no-sandbox']}},projects:[{name:'phone',use:{...devices['iPhone 13'],defaultBrowserType:'chromium'}},{name:'tablet',use:{...devices['iPad Mini'],defaultBrowserType:'chromium'}}],webServer:{command:'node scripts/preview-hanoura-cashbook.mjs',url:'http://127.0.0.1:3125',reuseExistingServer:false}});
