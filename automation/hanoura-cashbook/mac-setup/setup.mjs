@@ -23,6 +23,16 @@ export function verifyRecoverySource(folder,expected){
  if(!markers.every(marker=>code.includes(marker)))throw new Error('出納帳の接続先・利用者・コードが一致しません。変更せず停止しました');
  JSON.parse(readFileSync(join(folder,'appsscript.json'),'utf8'));
 }
+export function parseToolJSON(output,command){
+ try{return JSON.parse(output);}catch{}
+ // clasp 3.4.1 open-web-app prints JSON, then a browser-opening notice to stdout.
+ // Accept only this documented command-specific suffix, never arbitrary log fragments.
+ if(command==='open-web-app'){
+   const match=output.match(/^([\s\S]+?)\r?\n(?:Opening (https:\/\/script\.google\.com\/\S+) in your browser\.|Open (https:\/\/script\.google\.com\/\S+) in your browser to continue\.)\s*$/);
+   if(match){const result=JSON.parse(match[1]);if(result.url===(match[2]||match[3]))return result;}
+ }
+ throw new Error('Google公式ツールの応答を確認できません。設定を止めました。');
+}
 function redact(s){return String(s).replace(/Bearer\s+[^\s"']+/gi,'Bearer [非表示]').replace(/((?:access_token|refresh_token|client_secret)["']?\s*[:=]\s*["']?)[^\s"',}]+/gi,'$1[非表示]').replace(/([?&]code=)[^&\s]+/g,'$1[非表示]');}
 export async function install(bundle,options={}){
  const {owner,codeHash}=validatePayload(bundle);
@@ -55,7 +65,7 @@ export async function install(bundle,options={}){
      throw error;
    }
    if(!json)return output;
-   try{return JSON.parse(output);}catch{throw new Error('Google公式ツールの応答を確認できません。設定を止めました。');}
+   return parseToolJSON(output,args[0]);
  };
  if(!existsSync(sdk)){
    log('1/5 Google公式の設定ツールを準備しています…');

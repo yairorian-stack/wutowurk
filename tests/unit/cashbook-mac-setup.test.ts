@@ -3,7 +3,7 @@ import{mkdtempSync,mkdirSync,writeFileSync,readFileSync,existsSync,rmSync}from'n
 import{join}from'node:path';
 import{tmpdir}from'node:os';
 import vm from'node:vm';
-import{install,validatePayload}from'../../automation/hanoura-cashbook/mac-setup/setup.mjs';
+import{install,validatePayload,parseToolJSON}from'../../automation/hanoura-cashbook/mac-setup/setup.mjs';
 const id='fictional_script_identifier',deployment='fictional_deployment_identifier';
 function fixture(){
  const base=mkdtempSync(join(tmpdir(),'cashbook-installer-test-')),bundle=join(base,'bundle'),root=join(base,'local');
@@ -76,5 +76,25 @@ describe('確認した既存プロジェクトからの再開',()=>{
  });
  it('never uploads the initially pulled Code.js alongside the managed Code.gs',async()=>{
   const f=fixture();try{const execute=f.options.execute;await install(f.bundle,{...f.options,execute:async(cmd:string,args:string[])=>{const result=await execute(cmd,args);if(args.includes('create-script'))writeFileSync(join(f.root,'project/Code.js'),'function myFunction(){}');if(args.includes('push')){const project=JSON.parse(readFileSync(join(f.root,'project/.clasp.json'),'utf8'));expect(project.rootDir).toBe(join(f.root,'project/managed'));expect(existsSync(join(project.rootDir,'Code.js'))).toBe(false);}return result;}});}finally{f.cleanup();}
+ });
+});
+
+
+describe('Google公式claspのURL応答',()=>{
+ const url='https://script.google.com/macros/s/fictional_deployment/exec?authUser=owner%40example.invalid';
+ it('accepts real clasp JSON followed by its browser-opening notice',()=>{
+  for(const notice of [`Opening ${url} in your browser.`,`Open ${url} in your browser to continue.`])expect(parseToolJSON(JSON.stringify({url},null,2)+'\n'+notice+'\n','open-web-app')).toEqual({url});
+ });
+ it('rejects unrelated trailing output and mismatched URLs',()=>{
+  for(const text of [JSON.stringify({url})+'\nUnexpected log',JSON.stringify({url})+'\nOpening https://script.google.com/macros/s/other/exec in your browser.'])expect(()=>parseToolJSON(text,'open-web-app')).toThrow();
+  expect(()=>parseToolJSON(JSON.stringify({url})+`\nOpening ${url} in your browser.`,'create-deployment')).toThrow();
+ });
+ it('resumes completed deployment without pushing or publishing again',async()=>{
+  const f=fixture();try{const execute=f.options.execute;let notices='broken';
+   const options={...f.options,execute:async(cmd:string,args:string[])=>{const result=await execute(cmd,args);if(args.includes('open-web-app')&&notices==='broken')return 'unreadable initial response';if(args.includes('open-web-app')&&notices==='sdk'){const entry=JSON.parse(result);return result+`\nOpening ${entry.url} in your browser.\n`;}return result;}};
+   await expect(install(f.bundle,options)).rejects.toThrow('応答');notices='sdk';await install(f.bundle,options);notices='json';await install(f.bundle,options);
+   for(const command of ['push','create-deployment'])expect(f.calls.filter(args=>args.includes(command))).toHaveLength(1);
+   expect(readFileSync(join(f.root,'専用URL.txt'),'utf8')).not.toContain('authUser');
+  }finally{f.cleanup();}
  });
 });
